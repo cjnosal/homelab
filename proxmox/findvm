@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# print the ID of the VM with the given name
+
+# warning: name isn't required to be unique
+NAME=$1
+CONF_FILES=$(ls /etc/pve/qemu-server)
+
+for i in $CONF_FILES
+do
+  filepath=/etc/pve/qemu-server/$i
+  if grep -q "^name: ${NAME}$" $filepath
+  then
+    sed 's/.conf//' <<< $i
+    exit 0
+  fi 
+done
+
+>&2 echo template $NAME not found
+exit 1

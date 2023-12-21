@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# default: print ids of all VMs and containers
+# if argument "next" is provided print an ID available for the next VM
+
+ID_START=${ID_START:-100}
+ID_END=${ID_END:-500}
+
+CONF_FILES=$(ls /etc/pve/qemu-server ; ls /etc/pve/lxc)
+IDS=( $(sed s'/.conf//g' <<< $CONF_FILES) )
+
+IN_USE=$(echo "${IDS[*]}" | xargs -n1 echo | sort)
+
+for i in $(seq $ID_START $ID_END)
+do
+	if [[ ! " ${IDS[*]} " =~ " $i " ]]; then
+	    AVAILABLE="${i}"
+	    break
+	fi
+done
+
+if [[ $# -ge 1 && "$1" == "next" ]]
+then
+  echo $AVAILABLE
+else
+  echo "$IN_USE"
+fi

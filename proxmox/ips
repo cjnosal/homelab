@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# default: print IP address of all VMs and containers
+# if argument "next" is provided print an IP available for the next VM
+
+SUBNET=${SUBNET:-192.168.2}
+HOST_START=${HOST_START:-201}
+HOST_END=${HOST_END:-250}
+
+IPLIST=()
+for vm in $(ls /etc/pve/qemu-server/*.conf)
+do
+  ipconfig=$(grep ipconfig0 $vm | cut -d':' -f2-)
+  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+  IPLIST+=("$ip")
+done
+
+for lxc in $(ls /etc/pve/lxc/*.conf)
+do
+  ipconfig=$(grep net0 $lxc | cut -d':' -f2-)
+  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+  IPLIST+=("$ip")
+done
+
+IN_USE=$(echo "${IPLIST[*]}" | xargs -n1 echo | sort)
+
+for i in $(seq $HOST_START $HOST_END)
+do
+	if [[ ! " ${IPLIST[*]} " =~ " ${SUBNET}.${i} " ]]; then
+	    AVAILABLE="${SUBNET}.${i}"
+	    break
+	fi
+done
+
+if [[ $# -ge 1 && "$1" == "next" ]]
+then
+  echo $AVAILABLE
+else
+  echo "$IN_USE"
+fi

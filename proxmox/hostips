@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# print the hostname and IP address of all VMs and containers
+
+for vm in $(ls /etc/pve/qemu-server/*.conf)
+do
+  if grep -q "template: 1" $vm
+  then
+    continue
+  fi
+  ipconfig=$(grep ipconfig0 $vm | cut -d':' -f2-)
+  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+  if [[ -z "$ip " ]]
+  then
+    continue
+  fi
+  name=$(grep "^name:" $vm | awk '{print $2}')
+
+  echo $name $ip
+
+done
+
+for lxc in $(ls /etc/pve/lxc/*.conf)
+do
+  if grep -q "template: 1" $lxc
+  then
+    continue
+  fi
+  ipconfig=$(grep net0 $lxc | cut -d':' -f2-)
+  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+  if [[ -z "$ip " ]]
+  then
+    continue
+  fi
+  name=$(grep "^hostname:" $lxc | awk '{print $2}')
+
+  echo $name $ip
+done

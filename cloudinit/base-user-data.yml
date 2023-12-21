@@ -1,0 +1,46 @@
+#@ load("@ytt:data", "data")
+---
+hostname: #@ data.values.hostname
+manage_etc_hosts: true
+user: ubuntu
+users:
+  - default
+ssh_authorized_keys:
+#@ lines = data.values.ssh_authorized_keys.splitlines()
+#@ for key in range(len(lines)):
+- #@ lines[key]
+#@ end
+chpasswd:
+  expire: False
+ca_certs:
+  trusted:
+    #@ if hasattr(data.values, "step_root_ca"):
+    - #@ data.values.step_root_ca
+    #@ end
+    #@ if hasattr(data.values, "step_intermediate_ca"):
+    - #@ data.values.step_intermediate_ca
+    #@ end
+package_upgrade: true
+write_files:
+- path: /usr/local/bin/sudoappend
+  owner: root:root
+  permissions: '0755'
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export EDITOR=/bin/ed
+    echo "a
+    $(cat -)
+    .
+    w
+    q" | sudoedit $1
+- path: /usr/local/bin/sudoreplace
+  owner: root:root
+  permissions: '0755'
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export EDITOR="/bin/ed -E"
+    echo "1,\$$(cat -)
+    w
+    q" | sudoedit $1

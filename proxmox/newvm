@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+# create a new vm from the provided template
+
+TEMPLATE_NAME=$1
+VMNAME=$2
+
+USERDATA=""
+if [ $# -gt 2 ]
+then
+	USERDATA=$3
+fi
+
+MEMORY=${MEMORY:-4096}
+CORES=${CORES:-2}
+NAMESERVER=${NAMESERVER:-$(dig +noall +answer bind.home.arpa | awk '{print $5}')}
+IP=${IP:-""}
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+TEMPLATE_ID=$($SCRIPT_DIR/findvm $TEMPLATE_NAME)
+VMID=$($SCRIPT_DIR/ids next)
+
+if [[ -z "$IP" ]]
+then
+	DNS=$(dig ${VMNAME}.home.arpa +noall +answer)
+	if [[ -n "$DNS" ]]
+	then
+		IP=$(awk '{print $5}' <<< "$DNS") # reuse IP when recreating a VM
+	else
+		IP=$($SCRIPT_DIR/ips next) # find available IP address for new VM
+	fi
+fi
+
+qm clone $TEMPLATE_ID $VMID --name $VMNAME
+qm set $VMID --ipconfig0 ip=${IP}/23,gw=192.168.3.1
+
+qm set $VMID --cores $CORES
+qm set $VMID --memory $MEMORY
+
+qm set $VMID --searchdomain home.arpa
+qm set $VMID --nameserver ${NAMESERVER}
+
+if [[ -n "$USERDATA" ]]
+then
+    qm set $VMID --cicustom "user=local:snippets/${USERDATA}" # use provided cloudinit config
+else
+	qm set $VMID --sshkey /root/.ssh/vm.pub # always add default ssh key
+fi
+
+qm start $VMID
+
+ssh-keygen -f ~/.ssh/known_hosts -R $IP
+
+while ! ssh-keyscan -H $IP >> ~/.ssh/known_hosts
+do
+  echo waiting for ssh
+  sleep 2
+done
+
+if ! ssh -i /root/.ssh/vm ubuntu@${IP} cloud-init status --wait
+then
+	ssh -i /root/.ssh/vm ubuntu@${IP} cat /var/log/cloud-init-output.log
+	exit 1
+fi

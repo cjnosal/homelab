@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+# expand the partition and filesystem of a disk img
+
+OLD_IMG=$1
+NEW_IMG=$2
+SIZE=$3
+
+# assuming jammy cloudinit-based
+DEVICE=/dev/sda
+PARTITION=1
+
+cp $OLD_IMG $NEW_IMG 
+truncate -s $SIZE $NEW_IMG 
+qemu-img resize $NEW_IMG $SIZE # e.g. +2G
+virt-customize -a $NEW_IMG --run-command "growpart $DEVICE $PARTITION"
+virt-customize -a $NEW_IMG --run-command "resize2fs ${DEVICE}${PARTITION}"
+virt-filesystems --long -h --all -a $NEW_IMG

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+# create a qemu template from an ubuntu cloud image
+
+NAME=$1
+IMG=$2 #wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+VMID=$(ID_START=9000 ID_END=9500 $SCRIPT_DIR/ids next)
+
+virt-customize -a $IMG  --install qemu-guest-agent
+
+qm create $VMID --name $NAME --memory 4096  --cores 2 --net0 virtio,bridge=vmbr0
+qm importdisk $VMID $IMG local-lvm
+qm set $VMID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$VMID-disk-0
+qm set $VMID --boot c --bootdisk scsi0
+qm set $VMID --ide2 local-lvm:cloudinit
+qm set $VMID --serial0 socket --vga serial0
+qm set $VMID --agent enabled=1
+qm template $VMID
