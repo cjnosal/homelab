@@ -17,3 +17,4 @@ Experimenting with a single-node Proxmox environment to create an enterprise-lik
 * DNS (bind9)
 * CA (SmallStep)
 * LDAP (openLDAP)
+* OIDC (keycloak)
