@@ -7,7 +7,7 @@ source $SCRIPT_DIR/../generate-utils.sh
 
 export YTT_ip=$1
 export YTT_acme="https://step.home.arpa/acme/acme/directory"
-export YTT_hostname=ldap2
+export YTT_hostname=ldap
 export YTT_zone="home.arpa"
 export YTT_suffix="dc=home,dc=arpa"
 export YTT_placeholdercred="changeme"

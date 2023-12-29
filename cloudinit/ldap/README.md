@@ -22,16 +22,28 @@ replace: olcRootPW
 olcRootPW: $HASH
 E0F
 ```
+## add organizational units
+`sudo ldapadd -H ldapi:/// -f /run/org.ldif -W  -x -D cn=admin,dc=home,dc=arpa`
 
 ## add users and groups
-sudo ldapadd -H ldapi:/// -f /run/user.ldif -W  -x -D cn=admin,dc=home,dc=arpa
+Convenience scripts write ldif files and invoke ldapadd/ldapmodify
+```
+sudo addldapgroup $cn
+sudo addldapuser $uid $givenname $surname $email
+sudo addldapsystem $uid $displayname
+sudo addldapusertogroup $uid $cn
+```
 
-## set user password
+## set user temporary password
 
-ldappasswd -x -D cn=admin,dc=home,dc=arpa -W -S uid=conor,ou=people,dc=home,dc=arpa
+`ldappasswd -x -D cn=admin,dc=home,dc=arpa -W -S uid=$uid,ou=people,dc=home,dc=arpa`
+
+User can self-serve change the password
+`ldappasswd -x -D uid=$uid,ou=people,dc=home,dc=arpa -W -S uid=$uid,ou=people,dc=home,dc=arpa -H ldaps://ldap.home.arpa`
 
 ## verify
-
-ldapsearch -x -H ldap://ldap2.home.arpa "(uid=conor)" entryUuid # plain
-ldapsearch -x -ZZ -H ldap://ldap2.home.arpa "(uid=conor)" entryUuid # starttls
-ldapsearch -x -H ldaps://ldap2.home.arpa "(uid=conor)" entryUuid # tls
+```
+ldapsearch -x -H ldap://ldap.home.arpa "(uid=$uid)" entryUuid # plain
+ldapsearch -x -ZZ -H ldap://ldap.home.arpa "(uid=$uid)" entryUuid # starttls
+ldapsearch -x -H ldaps://ldap.home.arpa "(uid=$uid)" entryUuid # tls
+```

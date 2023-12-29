@@ -4,124 +4,6 @@
 #@overlay/match-child-defaults missing_ok=True
 ---
 write_files:
-- path: /run/slapd.conf
-  owner: root:root
-  permissions: '0644'
-  #@yaml/text-templated-strings
-  content: |
-    # This is the main slapd configuration file. See slapd.conf(5) for more
-    # info on the configuration options.
-
-    #######################################################################
-    # Global Directives:
-
-    # Schema and objectClass definitions
-    include         /etc/ldap/schema/core.schema
-    include         /etc/ldap/schema/cosine.schema
-    include         /etc/ldap/schema/nis.schema
-    include         /etc/ldap/schema/inetorgperson.schema
-
-    # Where the pid file is put. The init.d script
-    # will not stop the server if you change this.
-    pidfile         /var/run/slapd/slapd.pid
-
-    # List of arguments that were passed to the server
-    argsfile        /var/run/slapd/slapd.args
-
-    # Read slapd.conf(5) for possible values
-    loglevel        none
-
-    # Where the dynamically loaded modules are stored
-    modulepath      /usr/lib/ldap
-    moduleload      back_mdb
-
-    # The maximum number of entries that is returned for a search operation
-    sizelimit 500
-
-    # The tool-threads parameter sets the actual amount of cpu's that is used
-    # for indexing.
-    tool-threads 1
-
-    #######################################################################
-    # Specific Backend Directives for mdb:
-    # Backend specific directives apply to this backend until another
-    # 'backend' directive occurs
-    backend         mdb
-
-    #######################################################################
-    # Specific Backend Directives for 'other':
-    # Backend specific directives apply to this backend until another
-    # 'backend' directive occurs
-    #backend                <other>
-
-    #######################################################################
-    # Specific Directives for database #1, of type mdb:
-    # Database specific directives apply to this databasse until another
-    # 'database' directive occurs
-    database        mdb
-
-    # The base of your directory in database #1
-    suffix          "(@= data.values.suffix @)"
-
-    # rootdn directive for specifying a superuser on the database. This is needed
-    # for syncrepl.
-    # rootdn          "cn=admin,dc=example,dc=com"
-
-    # Where the database file are physically stored for database #1
-    directory       "/var/lib/ldap"
-
-    # Indexing options for database #1
-    index           objectClass eq
-
-    # Save the time that the entry gets modified, for database #1
-    lastmod         on
-
-    # Checkpoint the BerkeleyDB database periodically in case of system
-    # failure and to speed slapd shutdown.
-    checkpoint      512 30
-
-    # The userPassword by default can be changed
-    # by the entry owning it if they are authenticated.
-    # Others should not be able to see it, except the
-    # admin entry below
-    # These access lines apply to database #1 only
-    access to attrs=userPassword,shadowLastChange
-            by dn="cn=admin,(@= data.values.suffix @)" write
-            by anonymous auth
-            by self write
-            by * none
-
-    # Ensure read access to the base for things like
-    # supportedSASLMechanisms.  Without this you may
-    # have problems with SASL not knowing what
-    # mechanisms are available and the like.
-    # Note that this is covered by the 'access to *'
-    # ACL below too but if you change that as people
-    # are wont to do you'll still need this if you
-    # want SASL (and possible other things) to work
-    # happily.
-    access to dn.base="" by * read
-
-    # The admin dn has full write access, everyone else
-    # can read everything.
-    access to *
-            by dn="cn=admin,(@= data.values.suffix @)" write
-            by * read
-
-    # For Netscape Roaming support, each user gets a roaming
-    # profile for which they have write access to
-    #access to dn=".*,ou=Roaming,o=morsnet"
-    #        by dn="cn=admin,dc=example,dc=com" write
-    #        by dnattr=owner write
-
-    #######################################################################
-    # Specific Directives for database #2, of type 'other' (can be mdb too):
-    # Database specific directives apply to this databasse until another
-    # 'database' directive occurs
-    #database        <other>
-
-    # The base of your directory for database #2
-    #suffix         "dc=debian,dc=org"
 - path: /etc/ldap/ldap.conf
   owner: root:root
   permissions: '0644'
@@ -221,7 +103,7 @@ write_files:
     -
     add: olcTLSCertificateKeyFile
     olcTLSCertificateKeyFile: /etc/ldap/key.pem
-- path: /run/user.ldif
+- path: /run/org.ldif
   owner: root:root
   permissions: '0600'
   #@yaml/text-templated-strings
@@ -234,21 +116,78 @@ write_files:
     objectClass: organizationalUnit
     ou: Groups
 
-    dn: cn=me,ou=Groups,(@= data.values.suffix @)
+    dn: ou=Systems,(@= data.values.suffix @)
+    objectClass: organizationalUnit
+    ou: Systems
+- path: /usr/local/bin/addldapgroup
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    CN=$1
+    cat << EOF > /tmp/${CN}.ldif
+    dn: cn=${CN},ou=Groups,(@= data.values.suffix @)
     objectClass: groupOfNames
-    cn: me
-    member: uid=conor,ou=People,(@= data.values.suffix @)
-
-    dn: uid=conor,ou=People,(@= data.values.suffix @)
+    cn: ${CN}
+    member: uid=dummy,(@= data.values.suffix @)
+    EOF
+    ldapadd -H ldapi:/// -f /tmp/${CN}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+- path: /usr/local/bin/addldapuser
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    UID=$1
+    GIVEN_NAME=$2
+    SURNAME=$3
+    EMAIL=$4
+    OU=${5:-People}
+    cat << EOF > /tmp/${UID}.ldif
+    dn: uid=${UID},ou=${OU},(@= data.values.suffix @)
     objectClass: inetOrgPerson
-    uid: conor
-    sn: Nosal
-    givenName: Conor
-    cn: Conor Nosal
-    displayName: Conor Nosal
-    mail: c.nosal@gmail.com
+    uid: ${UID}
+    sn: $SURNAME
+    givenName: $GIVEN_NAME
+    cn: $GIVEN_NAME $SURNAME
+    displayName: $GIVEN_NAME $SURNAME
+    mail: $EMAIL
+    EOF
+    ldapadd -H ldapi:/// -f /tmp/${UID}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+- path: /usr/local/bin/addldapsystem
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    UID=$1
+    CN=$2
+    OU=Systems
+    cat << EOF > /tmp/${UID}.ldif
+    dn: uid=${UID},ou=${OU},(@= data.values.suffix @)
+    objectClass: inetOrgPerson
+    uid: ${UID}
+    sn: ${UID}
+    givenName: ${UID}
+    cn: $CN
+    displayName: $CN
+    mail: ${UID}@(@= data.values.zone @)
+    EOF
+    ldapadd -H ldapi:/// -f /tmp/${UID}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+- path: /usr/local/bin/addldapusertogroup
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    USER_UID=$1
+    GROUP_CN=$2
+    USER_DN=$(ldapsearch -x -H ldap:/// "(uid=${USER_UID})" dn | grep dn: | awk '{print $2}')
+    cat << EOF > /tmp/${USER_UID}_${GROUP_CN}.ldif
+    dn: cn=${GROUP_CN},ou=Groups,(@= data.values.suffix @)
+    changetype: modify
+    add: member
+    member: $USER_DN
+    EOF
+    ldapadd -H ldapi:/// -f /tmp/${USER_UID}_${GROUP_CN}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
 packages:
-- eatmydata
 - sssd-ldap
 - ldap-utils
 - ldb-tools
@@ -289,5 +228,4 @@ runcmd:
 #@yaml/text-templated-strings
 - hostnamectl set-hostname (@= data.values.hostname @).(@= data.values.zone @)
 - systemctl start sssd.service
-- slaptest -f /run/slapd.conf -F /etc/ldap/slapd.d
-- systemctl restart slapd
+- systemctl start slapd
