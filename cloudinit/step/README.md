@@ -6,9 +6,9 @@ Update cloudinit templates to trust the root and intermediate certs
 nameserver bind.home.arpa
 
 ```
-export IP=$(./workspace/ips next)
+export IP=$(./workspace/proxmox/ips next)
 ./workspace/cloudinit/step/generate.sh $IP
-./workspace/newvm jammy-cloudinit-4g step step.yml
+./workspace/proxmox/newvm jammy-cloudinit-4g step step.yml
 ```
 
 ## add DNS record

@@ -3,12 +3,12 @@
 Create an open LDAP server
 
 ## add DNS record
-export IP=$(./workspace/ips next)
+export IP=$(./workspace/proxmox/ips next)
 see cloudinit/bind/README.md (done first because cloudinit includes certbot setup)
 
 ```
 ./workspace/cloudinit/ldap/generate.sh $IP
-./workspace/newvm jammy-cloudinit-4g ldap ldap.yml
+./workspace/proxmox/newvm jammy-cloudinit-4g ldap ldap.yml
 ```
 
 ## change the placeholder admin password!

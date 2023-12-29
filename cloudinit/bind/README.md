@@ -7,9 +7,9 @@ Create a bind9 dns server with a home.arpa zone on the VM's IPv4 /23 network
 1. install ytt
 2. create bind server
 ```
-export IP=$(./workspace/ips next)
+export IP=$(./workspace/proxmox/ips next)
 ./workspace/cloudinit/bind/bind-generate.sh $IP
-NAMESERVER=192.168.3.1 ./workspace/newvm jammy-cloudinit-4g bind bind.yml
+NAMESERVER=192.168.3.1 ./workspace/proxmox/newvm jammy-cloudinit-4g bind bind.yml
 ```
 
 # Workstation gateway
