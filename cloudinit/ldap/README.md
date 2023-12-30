@@ -22,8 +22,6 @@ replace: olcRootPW
 olcRootPW: $HASH
 E0F
 ```
-## add organizational units
-`sudo ldapadd -H ldapi:/// -f /run/org.ldif -W  -x -D cn=admin,dc=home,dc=arpa`
 
 ## add users and groups
 Convenience scripts write ldif files and invoke ldapadd/ldapmodify

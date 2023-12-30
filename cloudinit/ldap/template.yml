@@ -124,6 +124,7 @@ write_files:
   permissions: '0755'
   #@yaml/text-templated-strings
   content: |
+    #!/usr/bin/env bash
     CN=$1
     cat << EOF > /tmp/${CN}.ldif
     dn: cn=${CN},ou=Groups,(@= data.values.suffix @)
@@ -131,52 +132,73 @@ write_files:
     cn: ${CN}
     member: uid=dummy,(@= data.values.suffix @)
     EOF
-    ldapadd -H ldapi:/// -f /tmp/${CN}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+    if [ $UID -eq 0 ]
+    then
+      AUTH_ARGS="-Y EXTERNAL"
+    else
+      AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
+    fi
+    ldapadd -H ldapi:/// -f /tmp/${CN}.ldif $AUTH_ARGS
 - path: /usr/local/bin/addldapuser
   owner: root:root
   permissions: '0755'
   #@yaml/text-templated-strings
   content: |
-    UID=$1
+    #!/usr/bin/env bash
+    USER_UID=$1
     GIVEN_NAME=$2
     SURNAME=$3
     EMAIL=$4
     OU=${5:-People}
-    cat << EOF > /tmp/${UID}.ldif
-    dn: uid=${UID},ou=${OU},(@= data.values.suffix @)
+    cat << EOF > /tmp/${USER_UID}.ldif
+    dn: uid=${USER_UID},ou=${OU},(@= data.values.suffix @)
     objectClass: inetOrgPerson
-    uid: ${UID}
+    uid: ${USER_UID}
     sn: $SURNAME
     givenName: $GIVEN_NAME
     cn: $GIVEN_NAME $SURNAME
     displayName: $GIVEN_NAME $SURNAME
     mail: $EMAIL
     EOF
-    ldapadd -H ldapi:/// -f /tmp/${UID}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+    if [ $UID -eq 0 ]
+    then
+      AUTH_ARGS="-Y EXTERNAL"
+    else
+      AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
+    fi
+    ldapadd -H ldapi:/// -f /tmp/${USER_UID}.ldif $AUTH_ARGS
 - path: /usr/local/bin/addldapsystem
   owner: root:root
   permissions: '0755'
   #@yaml/text-templated-strings
   content: |
-    UID=$1
+    #!/usr/bin/env bash
+    USER_UID=$1
     CN=$2
     OU=Systems
-    cat << EOF > /tmp/${UID}.ldif
-    dn: uid=${UID},ou=${OU},(@= data.values.suffix @)
+    cat << EOF > /tmp/${USER_UID}.ldif
+    dn: uid=${USER_UID},ou=${OU},(@= data.values.suffix @)
     objectClass: inetOrgPerson
-    uid: ${UID}
-    sn: ${UID}
-    givenName: ${UID}
+    uid: ${USER_UID}
+    sn: ${USER_UID}
+    givenName: ${USER_UID}
     cn: $CN
     displayName: $CN
-    mail: ${UID}@(@= data.values.zone @)
+    mail: ${USER_UID}@(@= data.values.zone @)
     EOF
-    ldapadd -H ldapi:/// -f /tmp/${UID}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+    if [ $UID -eq 0 ]
+    then
+      AUTH_ARGS="-Y EXTERNAL"
+    else
+      AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
+    fi
+    ldapadd -H ldapi:/// -f /tmp/${USER_UID}.ldif $AUTH_ARGS
 - path: /usr/local/bin/addldapusertogroup
   owner: root:root
   permissions: '0755'
   #@yaml/text-templated-strings
   content: |
+    #!/usr/bin/env bash
     USER_UID=$1
     GROUP_CN=$2
     USER_DN=$(ldapsearch -x -H ldap:/// "(uid=${USER_UID})" dn | grep dn: | awk '{print $2}')
@@ -186,7 +208,13 @@ write_files:
     add: member
     member: $USER_DN
     EOF
-    ldapadd -H ldapi:/// -f /tmp/${USER_UID}_${GROUP_CN}.ldif -W  -x -D cn=admin,(@= data.values.suffix @)
+    if [ $UID -eq 0 ]
+    then
+      AUTH_ARGS="-Y EXTERNAL"
+    else
+      AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
+    fi
+    ldapadd -H ldapi:/// -f /tmp/${USER_UID}_${GROUP_CN}.ldif $AUTH_ARGS
 packages:
 - sssd-ldap
 - ldap-utils
@@ -226,6 +254,15 @@ runcmd:
 - chmod 640 /etc/ldap/*.pem
 - ldapmodify -Y EXTERNAL -H ldapi:/// -f /run/certinfo.ldif
 #@yaml/text-templated-strings
+- |
+  ldapmodify -Q -Y EXTERNAL -H ldapi:/// << 'EOF'
+  dn: olcDatabase={1}mdb,cn=config
+  changetype: modify
+  add: olcAccess
+  olcAccess: {2}to dn.subtree="(@= data.values.suffix @)" by dn.exact=gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth manage
+  EOF
+#@yaml/text-templated-strings
 - hostnamectl set-hostname (@= data.values.hostname @).(@= data.values.zone @)
-- systemctl start sssd.service
-- systemctl start slapd
+- systemctl restart sssd.service
+- systemctl restart slapd
+- ldapadd -H ldapi:/// -f /run/org.ldif -Y EXTERNAL
