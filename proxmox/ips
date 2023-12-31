@@ -9,15 +9,17 @@ HOST_START=${HOST_START:-201}
 HOST_END=${HOST_END:-250}
 
 IPLIST=()
-for vm in $(ls /etc/pve/qemu-server/*.conf)
+for conf in $(ls /etc/pve/qemu-server/)
 do
+  vm=/etc/pve/qemu-server/$conf
   ipconfig=$(grep ipconfig0 $vm | cut -d':' -f2-)
   ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
   IPLIST+=("$ip")
 done
 
-for lxc in $(ls /etc/pve/lxc/*.conf)
+for conf in $(ls /etc/pve/lxc/)
 do
+  lxc=/etc/pve/lxc/$conf
   ipconfig=$(grep net0 $lxc | cut -d':' -f2-)
   ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
   IPLIST+=("$ip")

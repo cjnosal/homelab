@@ -3,8 +3,9 @@ set -uo pipefail
 
 # print the hostname and IP address of all VMs and containers
 
-for vm in $(ls /etc/pve/qemu-server/*.conf)
+for conf in $(ls /etc/pve/qemu-server/)
 do
+  vm=/etc/pve/qemu-server/$conf
   if grep -q "template: 1" $vm
   then
     continue
@@ -21,8 +22,9 @@ do
 
 done
 
-for lxc in $(ls /etc/pve/lxc/*.conf)
+for conf in $(ls /etc/pve/lxc/)
 do
+  lxc=/etc/pve/lxc/$conf
   if grep -q "template: 1" $lxc
   then
     continue
