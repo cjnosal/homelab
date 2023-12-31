@@ -1,0 +1,68 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:overlay", "overlay")
+#@overlay/match by=overlay.all,expects="0+"
+#@overlay/match-child-defaults missing_ok=True
+---
+users:
+- name: #@ data.values.username
+  gecos: #@ data.values.fullname
+  groups: sudo
+  shell: /bin/bash
+  sudo: ['ALL=(ALL) NOPASSWD:ALL']
+write_files:
+- path: /usr/local/bin/changeldappassword
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    ldappasswd -x -D uid=$(whoami),ou=people,(@= data.values.suffix @) -W -S uid=$(whoami),ou=people,(@= data.values.suffix @) -H ldaps://ldap.home.arpa
+- path: /etc/nsswitch.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    passwd:         files systemd ldap
+    group:          files systemd ldap
+    shadow:         files ldap
+    gshadow:        files
+
+    hosts:          files mdns4_minimal [NOTFOUND=return] dns
+    networks:       files
+
+    protocols:      db files
+    services:       db files
+    ethers:         db files
+    rpc:            db files
+
+    netgroup:       nis
+packages:
+ - bind9utils
+ - dnsutils
+runcmd:
+ - growpart /dev/sda 1
+ - resize2fs /dev/sda1
+ #@yaml/text-templated-strings
+ - |
+  debconf-set-selections <<EOF
+    nslcd nslcd/ldap-reqcert string demand
+    nslcd nslcd/ldap-uris string ldaps://ldap.home.arpa/
+    nslcd nslcd/ldap-base string dc=home,dc=arpa
+    nslcd nslcd/ldap-cacertfile string /etc/ssl/certs/ca-certificates.crt
+    nslcd nslcd/ldap-auth-type string none
+
+    ldap-auth-config ldap-auth-config/ldapns/ldap_version string 3
+    ldap-auth-config ldap-auth-config/ldapns/base-dn string dc=home,dc=arpa
+    ldap-auth-config ldap-auth-config/ldapns/ldap-server string ldaps://ldap.home.arpa
+    ldap-auth-config ldap-auth-config/move-to-debconf boolean true
+    ldap-auth-config ldap-auth-config/dbrootlogin boolean false
+    ldap-auth-config ldap-auth-config/dblogin boolean false
+
+  EOF
+ - wget https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
+ - wget https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
+ - dpkg -i step-cli_0.24.4_amd64.deb
+ - apt install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd
+ - service xrdp restart
+ - sudo systemctl enable nslcd
+ - systemctl start nslcd
+ - shutdown -r now
