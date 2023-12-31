@@ -99,7 +99,7 @@ runcmd:
 #@yaml/text-templated-strings
 - certbot certonly --standalone --server (@= data.values.acme @) --register-unsafely-without-email --cert-name (@= data.values.hostname @).(@= data.values.zone @) -d (@= data.values.hostname @).(@= data.values.zone @) 
 #@yaml/text-templated-strings
-- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/cert.pem /opt/keycloak/conf/server.crt.pem  
+- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/fullchain.pem /opt/keycloak/conf/server.crt.pem
 #@yaml/text-templated-strings
 - ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/privkey.pem /opt/keycloak/conf/server.key.pem 
 - chgrp -R keycloak /etc/letsencrypt
