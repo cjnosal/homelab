@@ -69,11 +69,27 @@ write_files:
 
     [Install]
     WantedBy=multi-user.target
+- path: /usr/local/bin/create-client
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # set client fields with `-s key=val` - see /opt/keycloak/bin/kcadm.sh create clients --help
+    # prints client secret
+
+    /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user admin
+    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r infrastructure -i $@)
+
+    /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=$CLIENT_ID --fields=secret | jq -r '.[0].secret'
 packages:
 - openjdk-19-jre-headless
 - postgresql
 - postgresql-client
 - postgresql-contrib
+- jq
 runcmd:
 - wget https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 - tar -xf keycloak-22.0.0.tar.gz

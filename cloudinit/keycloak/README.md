@@ -58,3 +58,9 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 
 In an incognito window browse to https://keycloak.home.arpa:8443/realms/infrastructure/account/#/
 Sign in with an LDAP user
+
+
+## generate clients from the CLI
+```
+CLIENT_SECRET=$(/usr/local/bin/create-client -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
+```
