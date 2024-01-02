@@ -38,6 +38,7 @@ write_files:
 packages:
  - bind9utils
  - dnsutils
+ - jq
 runcmd:
  - growpart /dev/sda 1
  - resize2fs /dev/sda1
@@ -61,7 +62,10 @@ runcmd:
  - wget https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
  - wget https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
  - dpkg -i step-cli_0.24.4_amd64.deb
- - apt install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd
+ - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+ - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+ - apt update
+ - apt install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
  - service xrdp restart
  - sudo systemctl enable nslcd
  - systemctl start nslcd

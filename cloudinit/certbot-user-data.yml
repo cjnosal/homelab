@@ -1,0 +1,62 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:overlay", "overlay")
+#@overlay/match by=overlay.all,expects="0+"
+#@overlay/match-child-defaults missing_ok=True
+---
+runcmd:
+- snap install --classic certbot
+- ln -s /snap/bin/certbot /usr/bin/certbot
+- export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+- echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+#@yaml/text-templated-strings
+- certbot certonly --standalone --server (@= data.values.acme @) --register-unsafely-without-email --cert-name (@= data.values.hostname @).(@= data.values.zone @) -d (@= data.values.hostname @).(@= data.values.zone @)
+- chmod g+rx /etc/letsencrypt/archive
+#@yaml/text-templated-strings
+- chmod g+rx /etc/letsencrypt/archive/(@= data.values.hostname @).(@= data.values.zone @)
+- chmod g+rx /etc/letsencrypt/live
+#@yaml/text-templated-strings
+- chmod g+rx /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)
+#@ if hasattr(data.values, "fullchain_path"):
+#@yaml/text-templated-strings
+- mkdir -p $(dirname (@= data.values.fullchain_path @))
+#@yaml/text-templated-strings
+- rm -rf (@= data.values.fullchain_path @)
+#@yaml/text-templated-strings
+- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/fullchain.pem (@= data.values.fullchain_path @)
+#@yaml/text-templated-strings
+- chmod 640 (@= data.values.fullchain_path @)
+#@ end
+#@ if hasattr(data.values, "chain_path"):
+#@yaml/text-templated-strings
+- mkdir -p $(dirname (@= data.values.chain_path @))
+#@yaml/text-templated-strings
+- rm -rf (@= data.values.chain_path @)
+#@yaml/text-templated-strings
+- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/chain.pem (@= data.values.chain_path @)
+#@yaml/text-templated-strings
+- chmod 640 (@= data.values.chain_path @)
+#@ end
+#@ if hasattr(data.values, "cert_path"):
+#@yaml/text-templated-strings
+- mkdir -p $(dirname (@= data.values.cert_path @))
+#@yaml/text-templated-strings
+- rm -rf (@= data.values.cert_path @)
+#@yaml/text-templated-strings
+- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/cert.pem (@= data.values.cert_path @)
+#@yaml/text-templated-strings
+- chmod 640 (@= data.values.cert_path @)
+#@ end
+#@ if hasattr(data.values, "privkey_path"):
+#@yaml/text-templated-strings
+- mkdir -p $(dirname (@= data.values.privkey_path @))
+#@yaml/text-templated-strings
+- rm -rf (@= data.values.privkey_path @)
+#@yaml/text-templated-strings
+- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/privkey.pem (@= data.values.privkey_path @)
+#@yaml/text-templated-strings
+- chmod 640 (@= data.values.privkey_path @)
+#@ end
+#@yaml/text-templated-strings
+- chgrp -R (@= data.values.cert_group @) /etc/letsencrypt
+#@yaml/text-templated-strings
+- chgrp -R (@= data.values.cert_group @) /etc/letsencrypt/archive/(@= data.values.hostname @).(@= data.values.zone @)/
