@@ -32,6 +32,16 @@ sudo addldapsystem $uid $displayname
 sudo addldapusertogroup $uid $cn
 ```
 
+### default groups:
+* keycloak-realm-admin: manage clients and roles in the infrastructure realm
+* step-admin: manage provisioners
+* step-provisioner-admin: issue arbitrary SANs using OIDC authorization (non-admins can request identity certs)
+* vault-user: manage kv secrets
+* vault-admin: manage vault configuration
+
+### designate ldap user as admin
+`/usr/local/bin/addldapadmin $USER_DN`
+
 ## set user temporary password
 
 `ldappasswd -x -D cn=admin,dc=home,dc=arpa -W -S uid=$uid,ou=people,dc=home,dc=arpa`

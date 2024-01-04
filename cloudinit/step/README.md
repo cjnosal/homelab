@@ -31,12 +31,19 @@ copy generated secret
 
 in step vm configure the OIDC provisioner
 * default admin name is `step` and the credential is in /etc/step-ca/password.txt
-* `step ca provisioner add keycloak --type OIDC --client-id step-ca --client-secret $CLIENT_SECRET --configuration-endpoint https://keycloak.home.arpa:8443/realms/infrastructure/.well-known/openid-configuration --listen-address :10000`
+* `step ca provisioner add keycloak --type OIDC --client-id step-ca --client-secret $CLIENT_SECRET --configuration-endpoint https://keycloak.home.arpa:8443/realms/infrastructure/.well-known/openid-configuration --listen-address :10000 --group step-admin`
 * `sudo systemctl restart step-ca`
 
 ### grant step admin or provisioner admin roles
 step ca admin add ${EMAIL} keycloak --super=true|false
 step ca provisioner update keycloak --admin=${EMAIL}
+
+admins can also be assigned by oidc group name instead of email
+step ca admin add step-admin keycloak --super=true
+step ca admin add step-admin cert-provisioner --super=true
+step ca provisioner update keycloak --admin=step-provisioner-admin
+
+NOTE: when promted for superuser admin name/subject you must enter the groupname (e.g. step-admin) instead of the member's username
 
 # Request a certificate
 ## initialize step CLI on a workstation

@@ -215,6 +215,25 @@ write_files:
       AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
     fi
     ldapadd -H ldapi:/// -f /tmp/${USER_UID}_${GROUP_CN}.ldif $AUTH_ARGS
+- path: /usr/local/bin/addldapadmin
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    USER_DN=$1
+    if [ $UID -eq 0 ]
+    then
+      AUTH_ARGS="-Y EXTERNAL"
+    else
+      AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
+    fi
+    ldapmodify -Q -Y EXTERNAL -H ldapi:/// << 'EOF'
+    dn: olcDatabase={1}mdb,cn=config
+    changetype: modify
+    add: olcAccess
+    olcAccess: {3}to dn.subtree="(@= data.values.suffix @)" by dn.exact=${USER_DN} manage by * break
+    EOF
 packages:
 - sssd-ldap
 - ldap-utils
@@ -266,3 +285,8 @@ runcmd:
 - systemctl restart sssd.service
 - systemctl restart slapd
 - ldapadd -H ldapi:/// -f /run/org.ldif -Y EXTERNAL
+- addldapgroup keycloak-realm-admin
+- addldapgroup step-admin
+- addldapgroup step-provisioner-admin
+- addldapgroup vault-user
+- addldapgroup vault-admin

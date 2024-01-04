@@ -11,6 +11,7 @@ export YTT_hostname=vault
 # certbot config
 export YTT_acme="https://step.home.arpa/acme/acme/directory"
 export YTT_zone="home.arpa"
+export YTT_suffix="dc=home,dc=arpa"
 export YTT_cert_group=vault
 export YTT_fullchain_path=/opt/vault/tls/tls.crt
 export YTT_privkey_path=/opt/vault/tls/tls.key

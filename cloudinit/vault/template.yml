@@ -105,18 +105,72 @@ runcmd:
 - export VAULT_TOKEN=$(jq -r .root_token /root/vaultinit.json)
 - vault operator unseal -non-interactive $(jq -r .unseal_keys_hex[0] /root/vaultinit.json)
 - |
-  vault policy write kv - <<EOF
+  vault policy write infrastructure-user - <<EOF
+  path "infrastructure/*" {
+    capabilities = ["create", "read", "update", "patch", "delete", "list"]
+  }
+  EOF
+- |
+  vault policy write kv-user - <<EOF
   path "kv/*" {
     capabilities = ["create", "read", "update", "patch", "delete", "list"]
   }
   EOF
+- vault policy write vault-admin -<<EOF
+  path "*" {
+    capabilities = ["create","read","update","patch","delete","list","sudo"]
+  }
+  EOF
 - vault auth enable oidc
-- vault secrets enable kv
+- vault auth enable ldap
+- vault secrets enable kv #! default for vault users
+- vault secrets enable -path=infrastructure kv #! restricted plugin for admins
 #@yaml/text-templated-strings
 - |
-  vault write auth/oidc/role/vault_user \
-      bound_audiences="vault" \
-      allowed_redirect_uris="https://(@= data.values.hostname @).(@= data.values.zone @):8200/ui/vault/auth/oidc/oidc/callback" \
-      allowed_redirect_uris="https://(@= data.values.hostname @).(@= data.values.zone @):8250/oidc/callback" \
-      user_claim="preferred_username" \
-      token_policies="kv"
+  vault write auth/oidc/role/vault-admin -<<EOF
+  {
+    "bound_audiences": "vault",
+    "allowed_redirect_uris": [
+      "https://(@= data.values.hostname @).(@= data.values.zone @):8200/ui/vault/auth/oidc/oidc/callback",
+      "https://(@= data.values.hostname @).(@= data.values.zone @):8250/oidc/callback"
+    ],
+    "user_claim": "preferred_username",
+    "token_policies": [ "vault-admin", "infrastructure-user", "kv-user" ],
+    "bound_claims": {
+      "groups": [
+        "vault-admin"
+      ]
+    }
+  }
+  EOF
+#@yaml/text-templated-strings
+- |
+  vault write auth/oidc/role/vault-user -<<EOF
+  {
+    "bound_audiences": "vault",
+    "allowed_redirect_uris": [
+      "https://(@= data.values.hostname @).(@= data.values.zone @):8200/ui/vault/auth/oidc/oidc/callback",
+      "https://(@= data.values.hostname @).(@= data.values.zone @):8250/oidc/callback"
+    ],
+    "user_claim": "preferred_username",
+    "token_policies": "kv-user",
+    "bound_claims": {
+      "groups": [
+        "vault-user"
+      ]
+    }
+  }
+  EOF
+#@yaml/text-templated-strings
+- |
+  vault write auth/ldap/config \
+    url=ldaps://ldap.(@= data.values.zone @) \
+    userdn="ou=People,(@= data.values.suffix @)" \
+    userattr=uid \
+    discoverdn=true \
+    anonymous_group_search=true \
+    groupdn="ou=Groups,(@= data.values.suffix @)" \
+    groupattr=cn \
+    groupfilter="(member={{.UserDN}})"
+- vault write auth/ldap/groups/vault-admin policies=vault-admin policies=kv-user policies=infrastructure-user
+- vault write auth/ldap/groups/vault-user policies=kv-user

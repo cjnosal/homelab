@@ -64,3 +64,25 @@ Sign in with an LDAP user
 ```
 CLIENT_SECRET=$(/usr/local/bin/create-client -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
 ```
+
+### expose LDAP groups to client
+* Navigate to the new client > client scopes > ${client}-dedicated
+* Add mapper > by configuration > group membership
+    * Name ldap-groups
+    * token claim name groups
+    * disable full group paths
+
+### Verify token
+```
+curl -kfsSL -X POST 'https://keycloak.home.arpa:8443/realms/infrastructure/protocol/openid-connect/token' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid' --data-urlencode 'response_type=id_token'  \
+  --data-urlencode 'client_id=$CLIENT_ID' --data-urlencode "client_secret=$CLIENT_SECRET" \
+  --data-urlencode 'username=$USERNAME' --data-urlencode "password=$USER_PASSWORD" | \
+  jq .access_token | cut -d'.' -f2 | base64 -d | jq .
+```
+
+## assign realm admin role to ldap group
+```
+/opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gname=keycloak-realm-admin --cclientid realm-management --rolename realm-admin
+```
