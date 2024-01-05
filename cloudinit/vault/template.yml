@@ -145,6 +145,9 @@ runcmd:
   path "auth/approle/role/+/secret-id" {
     capabilities = ["create", "update"]
   }
+  path "auth/approle/role/+/role-id" {
+    capabilities = ["read"]
+  }
   EOF
 - vault auth enable oidc
 - vault auth enable ldap
