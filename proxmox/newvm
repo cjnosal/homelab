@@ -66,8 +66,12 @@ do
   sleep 2
 done
 
-if ! ssh -i /root/.ssh/vm ubuntu@${IP} cloud-init status --wait
+ssh -i /root/.ssh/vm ubuntu@${IP} tail -f /var/log/cloud-init-output.log &
+RESULT=0
+if ! ssh -i /root/.ssh/vm ubuntu@${IP} cloud-init status --wait > /dev/null
 then
-	ssh -i /root/.ssh/vm ubuntu@${IP} cat /var/log/cloud-init-output.log
-	exit 1
+  echo "cloudinit failed"
+  RESULT=1
 fi
+kill $(jobs -p)
+exit $RESULT
