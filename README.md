@@ -18,4 +18,6 @@ Experimenting with a single-node Proxmox environment to create an enterprise-lik
 * CA (SmallStep)
 * LDAP (openLDAP)
 * OIDC (keycloak)
+* SSH CA (Vault)
+* Secret management (Vault)
 * Workstation (Lubuntu + xrdp + firefox)
