@@ -37,6 +37,7 @@ fi
 qm clone $TEMPLATE_ID $VMID --name $VMNAME
 qm set $VMID --ipconfig0 ip=${IP}/23,gw=192.168.3.1
 
+qm set $VMID --cpu host
 qm set $VMID --cores $CORES
 qm set $VMID --memory $MEMORY
 
