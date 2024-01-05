@@ -2,9 +2,25 @@
 ---
 hostname: #@ data.values.hostname
 manage_etc_hosts: true
-user: ubuntu
 users:
-  - default
+- name: ubuntu
+  home: /home/ubuntu
+  shell: /bin/bash
+  lock_passwd: True
+  gecos: Ubuntu
+  groups: [adm, cdrom, dip, lxd, sudo]
+  ssh_authorized_keys:
+  #@ lines = data.values.ssh_authorized_keys.splitlines()
+  #@ for key in range(len(lines)):
+  - #@ lines[key]
+  #@ end
+  sudo: ALL=(ALL) NOPASSWD:ALL
+- name: ops
+  home: /home/ops
+  shell: /bin/bash
+  lock_passwd: True
+  gecos: Ops Team
+  sudo: ALL=(ALL) NOPASSWD:ALL
 ssh_authorized_keys:
 #@ lines = data.values.ssh_authorized_keys.splitlines()
 #@ for key in range(len(lines)):
@@ -21,6 +37,8 @@ ca_certs:
     - #@ data.values.step_intermediate_ca
     #@ end
 package_upgrade: true
+packages:
+- jq
 write_files:
 - path: /usr/local/bin/sudoappend
   owner: root:root
@@ -44,3 +62,46 @@ write_files:
     echo "1,\$$(cat -)
     w
     q" | sudoedit $1
+#! role id can be inserted into the template disk instead of inserted by cloudinit
+#@ if hasattr(data.values, "ssh_host_role_id"):
+- path: /etc/ssh_host_role_id
+  owner: root:root
+  permissions: '0640'
+  content: #@ data.values.ssh_host_role_id
+#@ end
+#@ if hasattr(data.values, "vault_host_ssh_ca") and hasattr(data.values, "vault_client_ssh_ca"):
+- path: /etc/ssh/trusted-user-ca-keys.pem
+  owner: root:root
+  permissions: '0640'
+  content: #@ data.values.vault_client_ssh_ca
+- path: /etc/ssh/ssh_known_hosts
+  owner: root:root
+  permissions: '0640'
+  content: #@ "@cert-authority *.home.arpa {}".format(data.values.vault_host_ssh_ca)
+- path: /etc/ssh/sshd_config.d/home.arpa.conf
+  owner: root:root
+  permissions: '0640'
+  content: |
+    TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
+    HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+#@ end
+- path: /usr/local/bin/getsshcert
+  owner: root:root
+  permissions: '0750'
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f /etc/ssh_host_role_id ]]
+    then
+      echo "vault role id for ssh host cert signing role not present, skipping cert generation"
+      exit 0
+    fi
+    ROLE_ID=$(cat /etc/ssh_host_role_id)
+    PUB_KEY="$(cat /etc/ssh/ssh_host_rsa_key.pub)"
+    VAULT_TOKEN=$(curl -fSsL https://vault.home.arpa:8200/v1/auth/approle/login --data "{\"role_id\":\"$ROLE_ID\"}" | jq -r .auth.client_token)
+    curl -fSsL -X POST https://vault.home.arpa:8200/v1/ssh-host-signer/sign/hostrole -H"X-Vault-Token: $VAULT_TOKEN" \
+      --data "{\"public_key\":\"$PUB_KEY\",\"cert_type\":\"host\"}" | jq -r .data.signed_key > /etc/ssh/ssh_host_rsa_key-cert.pub
+    rm -f /etc/ssh_host_role_id
+
+runcmd:
+- /usr/local/bin/getsshcert

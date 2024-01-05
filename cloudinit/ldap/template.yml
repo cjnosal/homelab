@@ -290,3 +290,4 @@ runcmd:
 - addldapgroup step-provisioner-admin
 - addldapgroup vault-user
 - addldapgroup vault-admin
+- addldapgroup ssh-ops

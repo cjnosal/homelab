@@ -38,6 +38,7 @@ sudo addldapusertogroup $uid $cn
 * step-provisioner-admin: issue arbitrary SANs using OIDC authorization (non-admins can request identity certs)
 * vault-user: manage kv secrets
 * vault-admin: manage vault configuration
+* ssh-ops: issue SSH certs for principal `ops`
 
 ### designate ldap user as admin
 `/usr/local/bin/addldapadmin $USER_DN`

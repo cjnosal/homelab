@@ -12,6 +12,11 @@ VMID=$(ID_START=9000 ID_END=9500 $SCRIPT_DIR/ids next)
 
 virt-customize -a $IMG  --install qemu-guest-agent
 
+if [[ -f ${SCRIPT_DIR}/../cloudinit/ssh_host_role_id ]]
+then
+	virt-customize -a $IMG --write /etc/ssh_host_role_id:$(cat ${SCRIPT_DIR}/../cloudinit/ssh_host_role_id)
+fi
+
 qm create $VMID --name $NAME --memory 4096  --cores 2 --net0 virtio,bridge=vmbr0
 qm importdisk $VMID $IMG local-lvm
 qm set $VMID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$VMID-disk-0
