@@ -17,6 +17,8 @@ then
 	virt-customize -a $IMG --write /etc/ssh_host_role_id:$(cat ${SCRIPT_DIR}/../cloudinit/ssh_host_role_id)
 fi
 
+virt-customize -a $IMG --truncate /etc/machine-id
+
 qm create $VMID --name $NAME --memory 4096  --cores 2 --net0 virtio,bridge=vmbr0
 qm importdisk $VMID $IMG local-lvm
 qm set $VMID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$VMID-disk-0
