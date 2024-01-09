@@ -45,9 +45,10 @@ write_files:
     @ IN SOA (@= data.values.hostname @).(@= data.values.zone @). root.(@= data.values.hostname @).(@= data.values.zone @). (
              2022072651 ; Serial
              3600 ; Refresh
-             1800 ; Retry
+             180 ; Retry
              604800 ; Expire
-             604600 ) ; Negative Cache TTL
+             180 ; Negative Cache TTL
+    )
     ;Name Server Information
     @ IN NS (@= data.values.hostname @).(@= data.values.zone @).
 
@@ -72,7 +73,7 @@ write_files:
     @ IN SOA (@= data.values.zone @). root.(@= data.values.zone @). (
              2022072752 ;Serial
              3600 ;Refresh
-             1800 ;Retry
+             180 ;Retry
              604800 ;Expire
              86400 ;Minimum TTL
     )
