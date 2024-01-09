@@ -82,7 +82,7 @@ write_files:
     # prints client secret
 
     /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user admin
-    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r infrastructure -i $@)
+    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r infrastructure -i $@ )
 
     /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r infrastructure \
      -s name=ldap-groups \
