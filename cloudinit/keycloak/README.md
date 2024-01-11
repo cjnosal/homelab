@@ -28,6 +28,11 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 * Click Administrative Console
 
 ### Create realm
+
+Create a realm with ldap federation:
+`./create-realm $ADMIN_USER $ADMIN_PASSWORD $REALM`
+
+or manually:
 * Click master (realm dropdown)
 * Click Create Realm
 * Enter Realm Name: infrastructure
@@ -62,7 +67,7 @@ Sign in with an LDAP user
 
 ## generate clients from the CLI
 ```
-CLIENT_SECRET=$(/usr/local/bin/create-client -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
+CLIENT_SECRET=$(/usr/local/bin/create-client $ADMIN_USER $ADMIN_PASSWORD $REALM -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
 ```
 
 ### expose LDAP groups to client
@@ -73,12 +78,13 @@ CLIENT_SECRET=$(/usr/local/bin/create-client -s clientId=my_client -s 'redirectU
     * disable full group paths
 
 ### Verify token
+Requires direct grant enabled on the chosen client
 ```
 curl -kfsSL -X POST 'https://keycloak.home.arpa:8443/realms/infrastructure/protocol/openid-connect/token' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'grant_type=password' --data-urlencode 'scope=openid' --data-urlencode 'response_type=id_token'  \
-  --data-urlencode 'client_id=$CLIENT_ID' --data-urlencode "client_secret=$CLIENT_SECRET" \
-  --data-urlencode 'username=$USERNAME' --data-urlencode "password=$USER_PASSWORD" | \
+  --data-urlencode "client_id=$CLIENT_ID" --data-urlencode "client_secret=$CLIENT_SECRET" \
+  --data-urlencode "username=$USERNAME" --data-urlencode "password=$USER_PASSWORD" | \
   jq .access_token | cut -d'.' -f2 | base64 -d | jq .
 ```
 

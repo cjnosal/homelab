@@ -69,6 +69,50 @@ write_files:
 
     [Install]
     WantedBy=multi-user.target
+- path: /usr/local/bin/create-realm
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cd /opt/keycloak/bin
+
+    ADMIN_USER=$1
+    ADMIN_PASSWORD=$2
+    REALM=$3
+
+    ./kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user $ADMIN_USER --password $ADMIN_PASSWORD
+    ./kcadm.sh create realms -s enabled=true -s realm=${REALM}
+
+    REALM_ID=$(./kcadm.sh get realms/${REALM} --fields id | jq -r .id)
+    LDAP_ID=$(./kcadm.sh create components -r ${REALM} \
+        -s name="ldap" \
+        -s parentId=$REALM_ID \
+        -s providerId=ldap \
+        -s providerType=org.keycloak.storage.UserStorageProvider \
+        -s 'config.editMode=["READ_ONLY"]' \
+        -s 'config.usernameLDAPAttribute=["uid"]' \
+        -s 'config.uuidLDAPAttribute=["entryUUID"]' \
+        -s 'config.userObjectClasses=["inetOrgPerson"]' \
+        -s 'config.connectionUrl=["ldaps://ldap.(@= data.values.zone @)"]' \
+        -s 'config.usersDn=["ou=People,dc=home,dc=arpa"]' \
+        -s 'config.enabled=["true"]' \
+        -s 'config.authType=["none"]' \
+        -i)
+
+    ./kcadm.sh create components -r ${REALM} \
+        -s name="group-ldap-mapper" \
+        -s parentId=$LDAP_ID \
+        -s providerId=group-ldap-mapper \
+        -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+        -s 'config."groups.dn"=[ "ou=Groups,dc=home,dc=arpa" ]' \
+        -s 'config.mode=[ "READ_ONLY" ]' \
+        -s 'config."user.roles.retrieve.strategy"=[ "LOAD_GROUPS_BY_MEMBER_ATTRIBUTE" ]' \
+        -s 'config."membership.ldap.attribute"=[ "member" ]' \
+        -s 'config."group.object.classes"=[ "groupOfNames" ]' \
+        -i
 - path: /usr/local/bin/create-client
   owner: root:root
   permissions: '0755'
@@ -81,10 +125,17 @@ write_files:
     # mapper "ldap-groups" automatically added to include LDAP groups in the "groups" token claim
     # prints client secret
 
-    /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user admin
-    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r infrastructure -i $@ )
+    ADMIN_USER=$1
+    shift
+    ADMIN_PASSWORD=$1
+    shift
+    REALM=$1
+    shift
 
-    /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r infrastructure \
+    /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user $ADMIN_USER --password $ADMIN_PASSWORD
+    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${REALM} -i $@ )
+
+    /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${REALM} \
      -s name=ldap-groups \
      -s protocol=openid-connect \
      -s protocolMapper=oidc-group-membership-mapper \
@@ -95,7 +146,7 @@ write_files:
      -s 'config."userinfo.token.claim"=true' \
      -s 'config."access.token.claim"=true'
 
-    /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=$CLIENT_ID --fields=secret | jq -r '.[0].secret'
+    /opt/keycloak/bin/kcadm.sh get clients/$CID -r ${REALM} --fields=secret | jq -r '.secret'
 packages:
 - openjdk-19-jre-headless
 - postgresql
