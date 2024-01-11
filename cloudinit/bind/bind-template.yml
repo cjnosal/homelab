@@ -115,6 +115,12 @@ write_files:
     named-checkzone ${ZONE} /etc/bind/reverse.${ZONE}
 
     sudo rndc reload
+    while [[ -z "$(dig ${HOST}.${ZONE} @localhost +noall +answer)" ]]
+    do
+      sleep 2
+      echo retry
+    done
+    echo resolving ${HOST}.${ZONE} to $(dig ${HOST}.${ZONE} @localhost +noall +answer)
 - path: /usr/local/bin/aliashost.sh
   owner: root:root
   permissions: '0755'
