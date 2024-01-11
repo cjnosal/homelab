@@ -22,6 +22,8 @@ Users can login with:
 ```
 export VAULT_ADDR=https://vault.home.arpa:8200
 vault login -method=ldap username=$USER
+vault login -method=oidc role=vault-user username=$USER
+vault login -method=oidc role=ssh-ops username=$USER
 ```
 
 ## configure OIDC
@@ -57,6 +59,7 @@ vault write ssh-client-signer/roles/ssh-role -<<EOF
     "default_user": "ops",
     "ttl": "30m0s"
   }
+EOF
 ```
 
 OIDC roles are defined for each LDAP group (vault-admin, vault-user) via groups claim
@@ -89,6 +92,7 @@ On the Proxmox node:
 ```
 vault read --field role_id auth/approle/role/ssh-host-role/role-id > /root/workspace/cloudinit/ssh_host_role_id
 /root/workspace/proxmox/img2template jammy-cloudinit-4g jammy-cloudinit-4g.img
+# or scp ssh_host_role_id ubuntu@host:/tmp/ssh_host_role_id && sudo mv /tmp/ssh_host_role_id /etc/
 ```
 
 * retrieve the CA PEMs (will be consumed by cloudinit generation)
