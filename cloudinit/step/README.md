@@ -20,6 +20,18 @@ ssh -i .ssh/vm ubuntu@step.home.arpa step ca root > workspace/cloudinit/step_roo
 ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/cloudinit/step_intermediate_ca.pem
 ```
 
+## trust CA in existing vm
+```
+scp workspace/cloudinit/step_root_ca.pem ubuntu@bind.home.arpa:/tmp/steproot.crt
+scp workspace/cloudinit/step_intermediate_ca.pem ubuntu@bind.home.arpa:/tmp/step_intermediate.crt
+ssh ubuntu@bind.home.arpa << EOF
+sudo cp /tmp/steproot.crt /usr/local/share/ca-certificates/steproot.crt
+sudo cp /tmp/step_intermediate.crt /usr/local/share/ca-certificates/step_intermediate.crt
+
+sudo update-ca-certificates
+EOF
+```
+
 ## integrate with keycloak
 
 Limited users can request identitity certs for their LDAP email, and provisioner admins can request certs for arbitrary SANs authenticating with their LDAP credentials.
