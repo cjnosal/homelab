@@ -22,6 +22,11 @@ ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca
 
 ## trust CA in existing vm
 ```
+curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
+sudo update-ca-certificates
+```
+or
+```
 scp workspace/cloudinit/step_root_ca.pem ubuntu@bind.home.arpa:/tmp/steproot.crt
 scp workspace/cloudinit/step_intermediate_ca.pem ubuntu@bind.home.arpa:/tmp/step_intermediate.crt
 ssh ubuntu@bind.home.arpa << EOF
@@ -59,19 +64,25 @@ NOTE: when promted for superuser admin name/subject you must enter the groupname
 
 # Request a certificate
 ## initialize step CLI on a workstation
-On the step-ca VM retrieve the CA fingerprint:
-`sudo step certificate fingerprint /etc/step-ca/certs/root_ca.crt`
 
 On the workstation:
-`step ca bootstrap --ca-url https://step.home.arpa --install --fingerprint $FINGERPRINT`
+```
+step ca bootstrap --ca-url https://step.home.arpa --install \
+  --fingerprint $(curl -fSsL https://step.home.arpa:8443/fingerprint)
+```
 
 ## issue a certificate
+
+### manually
 `step ca certificate $SAN file.crt file.key`
 or
 `step ca certificate $EMAIL file.crt file.key`
 
 * select the oidc provisioner
 * authenticate in browser
+
+### acme
+`https://step.home.arpa/acme/acme/directory`
 
 ## inspect the certificate
 `openssl x509 -in file.crt -noout -text`

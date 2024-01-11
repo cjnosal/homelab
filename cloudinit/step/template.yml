@@ -58,6 +58,32 @@ write_files:
                     "renegotiation": false
             }
     }
+- path: /etc/caddy/Caddyfile
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    {
+        acme_ca https://step.home.arpa/acme/acme/directory
+        acme_ca_root /etc/step-ca/certs/root_ca.crt
+        skip_install_trust
+        https_port 8443
+    }
+
+    step.home.arpa {
+            tls caddy@step.home.arpa {
+                    ca https://step.home.arpa/acme/acme/directory
+                    ca_root /etc/step-ca/certs/root_ca.crt
+
+            }
+            root * /usr/share/caddy
+            file_server
+    }
+packages:
+- debian-keyring
+- debian-archive-keyring
+- apt-transport-https
+- curl
 runcmd:
   - wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.25.1/step-cli_0.25.1_amd64.deb
   - wget --progress=dot:giga https://dl.smallstep.com/gh-release/certificates/gh-release-header/v0.25.2/step-ca_0.25.2_amd64.deb
@@ -84,3 +110,14 @@ runcmd:
   - update-ca-certificates
   #@yaml/text-templated-strings
   - sudo -u ubuntu -- step ca bootstrap --ca-url https://(@= data.values.hostname @).(@= data.values.zone @):443 --install --fingerprint $(step certificate fingerprint /etc/step-ca/certs/root_ca.crt)
+  - curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install caddy
+  - step certificate fingerprint /etc/step-ca/certs/root_ca.crt > /usr/share/caddy/fingerprint
+  - cp /etc/step-ca/certs/root_ca.crt > /usr/share/caddy/step_root_ca.crt
+  - rm /usr/share/caddy/index.html
+  - usermod -aG step caddy
+  - chmod g+rx /etc/step-ca/certs
+  - chmod g+r /etc/step-ca/certs/root_ca.crt
+  - systemctl restart caddy
