@@ -250,7 +250,7 @@ runcmd:
     slapd slapd/domain string (@= data.values.zone @)
     slapd shared/organization string homelab
   EOF
-- apt install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes slapd
+- apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes slapd
 - snap install --classic certbot
 - ln -s /snap/bin/certbot /usr/bin/certbot
 - export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt

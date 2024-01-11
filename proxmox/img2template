@@ -4,7 +4,7 @@ set -euo pipefail
 # create a qemu template from an ubuntu cloud image
 
 NAME=$1
-IMG=$2 #wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+IMG=$2 #wget --progress=dot:giga https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 

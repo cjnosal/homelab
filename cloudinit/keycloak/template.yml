@@ -154,7 +154,7 @@ packages:
 - postgresql-contrib
 - jq
 runcmd:
-- wget https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
+- wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 - tar -xf keycloak-22.0.0.tar.gz
 - addgroup keycloak
 - adduser --system keycloak
@@ -163,8 +163,8 @@ runcmd:
 - rm keycloak-22.0.0.tar.gz
 - mv /run/keycloak.conf /opt/keycloak/conf/keycloak.conf
 - chown -R keycloak /opt/keycloak
-- wget https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
-- wget https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
+- wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
+- wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
 - systemctl start postgresql.service
 - sudo -u postgres createuser keycloak
 - sudo -u postgres createdb keycloak

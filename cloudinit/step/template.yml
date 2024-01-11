@@ -59,8 +59,8 @@ write_files:
             }
     }
 runcmd:
-  - wget https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.25.1/step-cli_0.25.1_amd64.deb
-  - wget https://dl.smallstep.com/gh-release/certificates/gh-release-header/v0.25.2/step-ca_0.25.2_amd64.deb
+  - wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.25.1/step-cli_0.25.1_amd64.deb
+  - wget --progress=dot:giga https://dl.smallstep.com/gh-release/certificates/gh-release-header/v0.25.2/step-ca_0.25.2_amd64.deb
   - dpkg -i step-cli_0.25.1_amd64.deb
   - dpkg -i step-ca_0.25.2_amd64.deb
   - setcap CAP_NET_BIND_SERVICE=+eip $(which step-ca)
@@ -77,7 +77,7 @@ runcmd:
         --provisioner cert-provisioner \
         --password-file /etc/step-ca/password.txt
   - chown -R step:step /etc/step-ca
-  - wget https://raw.githubusercontent.com/smallstep/certificates/v0.25.2/systemd/step-ca.service -O /etc/systemd/system/step-ca.service
+  - wget --progress=dot:giga https://raw.githubusercontent.com/smallstep/certificates/v0.25.2/systemd/step-ca.service -O /etc/systemd/system/step-ca.service
   - systemctl daemon-reload
   - systemctl enable --now step-ca
   - cp -r /etc/step-ca/certs/* /usr/local/share/ca-certificates/

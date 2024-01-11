@@ -60,13 +60,13 @@ runcmd:
     ldap-auth-config ldap-auth-config/dblogin boolean false
 
   EOF
- - wget https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
- - wget https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
+ - wget --progress=dot:giga https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
+ - wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
  - dpkg -i step-cli_0.24.4_amd64.deb
- - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+ - wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
  - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
- - apt update
- - apt install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
+ - apt-get update
+ - apt-get install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
  - service xrdp restart
  - sudo systemctl enable nslcd
  - systemctl start nslcd
