@@ -228,7 +228,7 @@ write_files:
     else
       AUTH_ARGS="-W  -x -D cn=admin,(@= data.values.suffix @)"
     fi
-    ldapmodify -Q -Y EXTERNAL -H ldapi:/// << 'EOF'
+    ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
     dn: olcDatabase={1}mdb,cn=config
     changetype: modify
     add: olcAccess
