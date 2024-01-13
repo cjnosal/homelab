@@ -10,11 +10,21 @@ users:
   shell: /bin/bash
   sudo: ['ALL=(ALL) NOPASSWD:ALL']
 write_files:
+- path: /etc/ldap/ldap.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    BASE (@= data.values.suffix @)
+    URI ldap://ldap.(@= data.values.zone @)
+    TLS_CACERT      /etc/ssl/certs/ca-certificates.crt
 - path: /usr/local/bin/changeldappassword
   owner: root:root
   permissions: '0755'
   #@yaml/text-templated-strings
   content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
     ldappasswd -x -D uid=$(whoami),ou=people,(@= data.values.suffix @) -W -S uid=$(whoami),ou=people,(@= data.values.suffix @) -H ldaps://ldap.home.arpa
 - path: /etc/nsswitch.conf
   owner: root:root
@@ -35,6 +45,146 @@ write_files:
     rpc:            db files
 
     netgroup:       nis
+- path: /etc/firefox/policies/policies.json
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    {
+      "policies": {
+        "Certificates": {
+          "ImportEnterpriseRoots": true,
+          "Install": [
+            "/etc/firefox/ca-certificates/step_root_ca.crt"
+          ]
+        },
+        "ManagedBookmarks": [
+          {
+            "toplevel_name": "Homelab"
+          },
+          {
+            "name": "Proxmox",
+            "url": "https://pve.home.arpa:8006"
+          },
+          {
+            "name": "Keycloak",
+            "children": [
+              {
+                "url": "https://keycloak.home.arpa:8443/admin/master/console",
+                "name": "admin console - master realm"
+              },
+              {
+                "url": "https://keycloak.home.arpa:8443/admin/infrastructure/console",
+                "name": "admin console - infrastructure realm"
+              },
+              {
+                "url": "https://keycloak.home.arpa:8443/realms/infrastructure/account/#/",
+                "name": "account - infrastructure realm"
+              }
+            ]
+          },
+          {
+            "name": "Vault",
+            "url": "https://vault.home.arpa:8200/ui/vault/auth?with=oidc"
+          }
+        ]
+      }
+    }
+- path: /etc/skel/.xscreensaver
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    # XScreenSaver Preferences File
+    # Written by xscreensaver-demo 5.45
+    # https://www.jwz.org/xscreensaver/
+
+    timeout:        0:10:00
+    cycle:          0:10:00
+    lock:           False
+    lockTimeout:    0:00:00
+    passwdTimeout:  0:00:30
+    visualID:       default
+    installColormap:    True
+    verbose:        False
+    timestamp:      True
+    splash:         False
+    splashDuration: 0:00:05
+    demoCommand:    xscreensaver-demo
+    prefsCommand:   xscreensaver-demo -prefs
+    nice:           10
+    memoryLimit:    0
+    fade:           True
+    unfade:         False
+    fadeSeconds:    0:00:03
+    fadeTicks:      20
+    captureStderr:  True
+    ignoreUninstalledPrograms:False
+    font:           *-medium-r-*-140-*-m-*
+    dpmsEnabled:    False
+    dpmsQuickOff:   False
+    dpmsStandby:    2:00:00
+    dpmsSuspend:    2:00:00
+    dpmsOff:        4:00:00
+    grabDesktopImages:  False
+    grabVideoFrames:    False
+    chooseRandomImages: False
+    imageDirectory:
+
+    mode:           blank
+    selected:       118
+
+    textMode:       url
+    textLiteral:    XScreenSaver
+    textFile:
+    textProgram:    fortune
+    textURL:        https://feeds.feedburner.com/ubuntu-news
+
+    pointerPollTime:    0:00:05
+    pointerHysteresis:  10
+    windowCreationTimeout:0:00:30
+    initialDelay:   0:00:00
+    GetViewPortIsFullOfLies:False
+    procInterrupts: True
+    xinputExtensionDev: False
+    overlayStderr:  True
+    authWarningSlack:   20
+- path: /etc/skel/.profile
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    # ~/.profile: executed by the command interpreter for login shells.
+    # This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
+    # exists.
+    # see /usr/share/doc/bash/examples/startup-files for examples.
+    # the files are located in the bash-doc package.
+
+    # the default umask is set in /etc/profile; for setting the umask
+    # for ssh logins, install and configure the libpam-umask package.
+    #umask 022
+
+    # if running bash
+    if [ -n "$BASH_VERSION" ]; then
+        # include .bashrc if it exists
+        if [ -f "$HOME/.bashrc" ]; then
+            . "$HOME/.bashrc"
+        fi
+    fi
+
+    # set PATH so it includes user's private bin if it exists
+    if [ -d "$HOME/bin" ] ; then
+        PATH="$HOME/bin:$PATH"
+    fi
+
+    # set PATH so it includes user's private bin if it exists
+    if [ -d "$HOME/.local/bin" ] ; then
+        PATH="$HOME/.local/bin:$PATH"
+    fi
+
+    # Homelab setup
+
+    export VAULT_ADDR=https://vault.home.arpa:8200
 packages:
  - bind9utils
  - dnsutils
@@ -74,4 +224,11 @@ runcmd:
  - tar -xf keycloak-22.0.0.tar.gz
  - mv keycloak-22.0.0/bin/* /usr/local/bin/
  - rm keycloak-22.0.0.tar.gz
- - shutdown -r now
+ - sudo -u cnosal step ca bootstrap --ca-url https://step.home.arpa --install --fingerprint $(curl -fSsL https://step.home.arpa:8443/fingerprint)
+ - curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
+ - curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8443/step_intermediate_ca.crt
+ - mkdir -p /etc/firefox/ca-certificates
+ - chmod a+rx /etc/firefox/ca-certificates
+ - cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
+ - chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
+ - shutdown -r +1

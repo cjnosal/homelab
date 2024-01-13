@@ -9,5 +9,6 @@ export YTT_hostname=workstation
 export YTT_username=$1
 export YTT_fullname=$2
 export YTT_suffix="dc=home,dc=arpa"
+export YTT_zone="home.arpa"
 
 write_snippet workstation.yml -f ${SCRIPT_DIR}/template.yml
