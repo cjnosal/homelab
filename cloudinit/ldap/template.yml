@@ -158,7 +158,7 @@ write_files:
     uid: ${USER_UID}
     sn: $SURNAME
     givenName: $GIVEN_NAME
-    cn: $GIVEN_NAME $SURNAME
+    cn: $GIVEN_NAME
     displayName: $GIVEN_NAME $SURNAME
     mail: $EMAIL
     EOF
