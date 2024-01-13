@@ -64,17 +64,20 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     {
-        acme_ca https://step.home.arpa/acme/acme/directory
-        acme_ca_root /etc/step-ca/certs/root_ca.crt
-        skip_install_trust
-        https_port 8443
+            skip_install_trust
+            ocsp_stapling off
+            https_port 8443
     }
 
     step.home.arpa {
-            tls caddy@step.home.arpa {
-                    ca https://step.home.arpa/acme/acme/directory
-                    ca_root /etc/step-ca/certs/root_ca.crt
-
+            tls {
+                    # must be on port 443, which is taken by step online CA
+                    # http challenge must be on port 80, which is free
+                    issuer acme https://step.home.arpa/acme/acme/directory {
+                            email caddy@step.home.arpa
+                            disable_tlsalpn_challenge
+                            trusted_roots /etc/step-ca/certs/root_ca.crt
+                    }
             }
             root * /usr/share/caddy
             file_server
