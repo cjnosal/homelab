@@ -125,6 +125,7 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     #!/usr/bin/env bash
+    set -euo pipefail
     CN=$1
     cat << EOF > /tmp/${CN}.ldif
     dn: cn=${CN},ou=Groups,(@= data.values.suffix @)
@@ -145,6 +146,7 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     #!/usr/bin/env bash
+    set -euo pipefail
     USER_UID=$1
     GIVEN_NAME=$2
     SURNAME=$3
@@ -173,6 +175,7 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     #!/usr/bin/env bash
+    set -euo pipefail
     USER_UID=$1
     CN=$2
     OU=Systems
@@ -199,6 +202,7 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     #!/usr/bin/env bash
+    set -euo pipefail
     USER_UID=$1
     GROUP_CN=$2
     USER_DN=$(ldapsearch -x -H ldap:/// "(uid=${USER_UID})" dn | grep dn: | awk '{print $2}')
@@ -221,6 +225,7 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     #!/usr/bin/env bash
+    set -euo pipefail
     USER_DN=$1
     if [ $UID -eq 0 ]
     then
