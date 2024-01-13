@@ -87,4 +87,22 @@ or
 `https://step.home.arpa/acme/acme/directory`
 
 ## inspect the certificate
+
+### view a certificate
 `openssl x509 -in file.crt -noout -text`
+
+### verify a chain
+```
+openssl verify -verbose server.pem
+openssl verify -verbose -no-CApath -CAfile root.pem intermediate.pem
+openssl verify -verbose -no-CApath -CAfile intermediate.pem -partial_chain server.pem
+```
+
+### save a remote server's cert chain
+```
+echo D | openssl s_client -showcerts -connect step.home.arpa:443 2>/dev/null | awk '
+/BEGIN CERTIFICATE/,/END CERTIFICATE/ {
+print $0
+}
+' | awk 'split_after==1{n++;split_after=0} /-----END CERTIFICATE-----/ {split_after=1} {print > "cert" n ".pem"}'
+```
