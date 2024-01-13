@@ -22,7 +22,9 @@ ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca
 
 ## trust CA in existing vm
 ```
-curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
+sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
+sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8443/step_intermediate_ca.crt
+sudo chmod -R a+r /usr/local/share/ca-certificates/*.crt
 sudo update-ca-certificates
 ```
 or
@@ -32,7 +34,7 @@ scp workspace/cloudinit/step_intermediate_ca.pem ubuntu@bind.home.arpa:/tmp/step
 ssh ubuntu@bind.home.arpa << EOF
 sudo cp /tmp/steproot.crt /usr/local/share/ca-certificates/steproot.crt
 sudo cp /tmp/step_intermediate.crt /usr/local/share/ca-certificates/step_intermediate.crt
-
+sudo chmod -R a+r /usr/local/share/ca-certificates/*.crt
 sudo update-ca-certificates
 EOF
 ```

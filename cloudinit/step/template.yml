@@ -104,20 +104,25 @@ runcmd:
         --password-file /etc/step-ca/password.txt
   - chown -R step:step /etc/step-ca
   - wget --progress=dot:giga https://raw.githubusercontent.com/smallstep/certificates/v0.25.2/systemd/step-ca.service -O /etc/systemd/system/step-ca.service
+  - cp -r /etc/step-ca/certs/* /usr/local/share/ca-certificates/
+  - chmod -R a+r /usr/local/share/ca-certificates/*.crt
+  - update-ca-certificates
   - systemctl daemon-reload
   - systemctl enable --now step-ca
-  - cp -r /etc/step-ca/certs/* /usr/local/share/ca-certificates/
-  - update-ca-certificates
   #@yaml/text-templated-strings
-  - sudo -u ubuntu -- step ca bootstrap --ca-url https://(@= data.values.hostname @).(@= data.values.zone @):443 --install --fingerprint $(step certificate fingerprint /etc/step-ca/certs/root_ca.crt)
+  - while ! curl -fSsL https://(@= data.values.hostname @).(@= data.values.zone @):443/health; do echo waiting for step ca; sleep 2; done
+  #@yaml/text-templated-strings
+  - sudo -u ubuntu -- bash -c "export STEPPATH=/home/ubuntu/.step; step ca bootstrap --ca-url https://(@= data.values.hostname @).(@= data.values.zone @):443 --install --fingerprint $(step certificate fingerprint  /usr/local/share/ca-certificates/root_ca.crt)"
   - curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
   - apt-get update
-  - apt-get install caddy
+  - apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes caddy
   - step certificate fingerprint /etc/step-ca/certs/root_ca.crt > /usr/share/caddy/fingerprint
-  - cp /etc/step-ca/certs/root_ca.crt > /usr/share/caddy/step_root_ca.crt
+  - cp /etc/step-ca/certs/root_ca.crt /usr/share/caddy/step_root_ca.crt
+  - cp /etc/step-ca/certs/intermediate_ca.crt /usr/share/caddy/step_intermediate_ca.crt
   - rm /usr/share/caddy/index.html
   - usermod -aG step caddy
   - chmod g+rx /etc/step-ca/certs
   - chmod g+r /etc/step-ca/certs/root_ca.crt
+  - chmod a+r /usr/share/caddy/*
   - systemctl restart caddy
