@@ -92,6 +92,7 @@ write_files:
     if ! curl -fSsL https://vault.home.arpa:8200/v1/sys/health
     then
       echo "vault not available, skip fetching client ca"
+      exit 0
     fi
     curl -fSsL -o /etc/ssh/trusted-user-ca-keys.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
 - path: /usr/local/bin/getsshserverca
@@ -103,6 +104,7 @@ write_files:
     if ! curl -fSsL https://vault.home.arpa:8200/v1/sys/health
     then
       echo "vault not available, skip fetching server ca"
+      exit 0
     fi
     PEM=$(curl -fSsL https://vault.home.arpa:8200/v1/ssh-host-signer/public_key)
     echo "@cert-authority *.home.arpa $PEM" > /etc/ssh/ssh_known_hosts
