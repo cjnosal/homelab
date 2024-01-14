@@ -6,9 +6,9 @@
 users:
 - name: step
   system: true
-  home: /etc/step-ca
+  homedir: /etc/step-ca
   shell: /bin/false
-  sudo: False
+  sudo: null
 write_files:
 - path: /etc/step-ca/config/ca.json
   owner: root:root

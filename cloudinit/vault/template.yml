@@ -9,9 +9,9 @@ users:
 - name: vault
   primary_group: vault
   system: true
-  home: /opt/vault
+  homedir: /opt/vault
   shell: /bin/false
-  sudo: False
+  sudo: null
 write_files:
 - path: /run/vault.hcl
   owner: root:root

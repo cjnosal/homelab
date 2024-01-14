@@ -4,7 +4,7 @@ hostname: #@ data.values.hostname
 manage_etc_hosts: true
 users:
 - name: ubuntu
-  home: /home/ubuntu
+  homedir: /home/ubuntu
   shell: /bin/bash
   lock_passwd: True
   gecos: Ubuntu
@@ -16,7 +16,7 @@ users:
   #@ end
   sudo: ALL=(ALL) NOPASSWD:ALL
 - name: ops
-  home: /home/ops
+  homedir: /home/ops
   shell: /bin/bash
   lock_passwd: True
   gecos: Ops Team
@@ -28,14 +28,12 @@ ssh_authorized_keys:
 #@ end
 chpasswd:
   expire: False
+#@ if hasattr(data.values, "step_root_ca") and hasattr(data.values, "step_intermediate_ca"):
 ca_certs:
   trusted:
-    #@ if hasattr(data.values, "step_root_ca"):
     - #@ data.values.step_root_ca
-    #@ end
-    #@ if hasattr(data.values, "step_intermediate_ca"):
     - #@ data.values.step_intermediate_ca
-    #@ end
+#@ end
 package_upgrade: true
 packages:
 - jq
