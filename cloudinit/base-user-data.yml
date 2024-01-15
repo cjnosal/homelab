@@ -34,7 +34,7 @@ ca_certs:
     - #@ data.values.step_root_ca
     - #@ data.values.step_intermediate_ca
 #@ end
-package_upgrade: true
+package_upgrade: false #! systemctl dbus errors
 packages:
 - jq
 write_files:
