@@ -21,9 +21,9 @@ In LDAP server, `addldapusertogroup $user <vault-admin|vault-user>`
 Users can login with:
 ```
 export VAULT_ADDR=https://vault.home.arpa:8200
-vault login -method=ldap username=$USER
-vault login -method=oidc role=vault-user username=$USER
-vault login -method=oidc role=ssh-ops username=$USER
+vault login -no-print -method=ldap username=$USER
+vault login -no-print -method=oidc role=vault-user username=$USER
+vault login -no-print -method=oidc role=ssh-ops username=$USER
 ```
 
 ## configure OIDC
