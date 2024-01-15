@@ -1,0 +1,7 @@
+#@data/values
+#! make a copy named user.yml to customize
+---
+username: admin
+givenname: first
+surname: user
+email: admin@home.arpa

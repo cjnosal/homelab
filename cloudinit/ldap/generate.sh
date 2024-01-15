@@ -10,6 +10,8 @@ export YTT_acme="https://step.home.arpa/acme/acme/directory"
 export YTT_hostname=ldap
 export YTT_zone="home.arpa"
 export YTT_suffix="dc=home,dc=arpa"
-export YTT_placeholdercred="changeme"
 
-write_snippet ldap.yml -f ${SCRIPT_DIR}/template.yml
+write_snippet ldap.yml -f ${SCRIPT_DIR}/template.yml \
+  --data-value-file placeholderadmincred=${SCRIPT_DIR}/../ldap_admin.passwd \
+  --data-value-file placeholderusercred=${SCRIPT_DIR}/../user.passwd \
+  -f ${SCRIPT_DIR}/../user.yml

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+while ! ssh-keyscan -H $1 >> ~/.ssh/known_hosts
+do
+  echo waiting for ssh $1
+  sleep 2
+done

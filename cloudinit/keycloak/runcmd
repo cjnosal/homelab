@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLACEHOLDER_CRED=$1
+PLACEHOLDER_ADMIN_CRED=$1
+PLACEHOLDER_DB_CRED=$2
 export ZONE=home.arpa
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
@@ -18,7 +19,7 @@ wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/n
 systemctl start postgresql.service
 sudo -u postgres createuser keycloak
 sudo -u postgres createdb keycloak
-sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$PLACEHOLDER_CRED';"
+sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$PLACEHOLDER_DB_CRED';"
 /opt/keycloak/bin/kc.sh build --db=postgres
 
 export CERT_GROUP=keycloak
@@ -28,3 +29,19 @@ initcertbot keycloak.${ZONE}
 
 systemctl enable keycloak
 systemctl start keycloak
+systemctl is-active keycloak --wait
+
+while ! curl -fSsL  https://keycloak.home.arpa:8443/health
+do
+	echo waiting for keycloak
+	sleep 2
+done
+
+#/opt/keycloak/bin/kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm master --user admin --password ${PLACEHOLDER_CRED}
+
+create-realm admin ${PLACEHOLDER_ADMIN_CRED} infrastructure
+
+LDAP_ID=$(/opt/keycloak/bin/kcadm.sh get components -q name=ldap -r infrastructure | jq -r '.[0].id')
+/opt/keycloak/bin/kcadm.sh create user-storage/${LDAP_ID}/sync?action=triggerFullSync -r infrastructure
+
+/opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gname=keycloak-realm-admin --cclientid realm-management --rolename realm-admin

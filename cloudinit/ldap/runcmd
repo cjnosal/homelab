@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLACEHOLDER_CRED=$1
+PLACEHOLDER_ADMIN_CRED=$1
+PLACEHOLDER_USER_CRED=$2
+USERNAME=$3
+USER_GIVEN_NAME=$4
+USER_SURNAME=$5
+USER_EMAIL=$6
+
 ZONE=home.arpa
 SUFFIX='dc=home,dc=arpa'
 
 debconf-set-selections <<EOF
-  slapd slapd/internal/generated_adminpw password $PLACEHOLDER_CRED
-  slapd slapd/password2 password $PLACEHOLDER_CRED
-  slapd slapd/internal/adminpw password $PLACEHOLDER_CRED
-  slapd slapd/password1 password $PLACEHOLDER_CRED
+  slapd slapd/internal/generated_adminpw password $PLACEHOLDER_ADMIN_CRED
+  slapd slapd/password2 password $PLACEHOLDER_ADMIN_CRED
+  slapd slapd/internal/adminpw password $PLACEHOLDER_ADMIN_CRED
+  slapd slapd/password1 password $PLACEHOLDER_ADMIN_CRED
   slapd slapd/domain string ${ZONE}
   slapd shared/organization string homelab
 EOF
@@ -42,3 +48,17 @@ addldapgroup step-provisioner-admin
 addldapgroup vault-user
 addldapgroup vault-admin
 addldapgroup ssh-ops
+
+# initial admin
+addldapuser $USERNAME $USER_GIVEN_NAME $USER_SURNAME $USER_EMAIL
+
+addldapusertogroup $USERNAME keycloak-realm-admin
+addldapusertogroup $USERNAME step-admin
+addldapusertogroup $USERNAME step-provisioner-admin
+addldapusertogroup $USERNAME vault-user
+addldapusertogroup $USERNAME vault-admin
+addldapusertogroup $USERNAME ssh-ops
+
+addldapadmin uid=${USERNAME},ou=People,${SUFFIX}
+
+ldappasswd -x -D cn=admin,${SUFFIX} -w $PLACEHOLDER_ADMIN_CRED -s $PLACEHOLDER_USER_CRED -S uid=${USERNAME},ou=people,${SUFFIX}

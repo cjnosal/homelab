@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+ID=$(${SCRIPT_DIR}/findvm jammy-cloudinit-4g)
+if [[ -z "$ID" ]]
+then
+  echo "template jammy-cloudinit-4g not found"
+  exit 1
+fi
+
+if [[ ! -f jammy-server-cloudimg-amd64-4g.img ]]
+then
+  echo "image jammy-server-cloudimg-amd64-4g.img not found"
+  exit 1
+fi
+
+virt-customize -a jammy-server-cloudimg-amd64-4g.img --run-command "apt update -y && apt upgrade -y"
+
+qm destroy $ID
+
+${SCRIPT_DIR}/img2template jammy-cloudinit-4g jammy-server-cloudimg-amd64-4g.img

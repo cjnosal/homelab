@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+rm -f jammy-server-cloudimg-amd64.img
+rm -f jammy-server-cloudimg-amd64-4g.img
+
+wget --progress=dot:giga https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+./workspace/proxmox/resizeimg jammy-server-cloudimg-amd64.img jammy-server-cloudimg-amd64-4g.img 4G
+./workspace/proxmox/img2template jammy-cloudinit-4g jammy-server-cloudimg-amd64-4g.img

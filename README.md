@@ -6,9 +6,15 @@ Experimenting with a single-node Proxmox environment to create an enterprise-lik
 
 ### Environment setup
 
+* Proxmox node at 192.168.2.200 with root sshkey in local agent
 * IPv4 bridged network with 192.168.2/23 CIDR
 * home.arpa TLD
 * Carvel `ytt` available on the Proxmox node
+
+### Bootstrap VMs
+
+Copy cloudinit/sample-user.yml to cloudinit/user.yml and customize the values for the first admin,
+then run bootstrap.sh
 
 ## Cloudinit
 

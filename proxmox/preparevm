@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CLOUDINIT=$1
+
+echo set up ${CLOUDINIT}
+export IP=$(./workspace/proxmox/ips next)
+
+if [[ "${SKIP_DOMAIN:-}" != "true" ]]
+then
+  ssh ubuntu@bind.home.arpa addhost.sh ${CLOUDINIT} $IP
+fi
+
+./workspace/cloudinit/${CLOUDINIT}/generate.sh $IP
+./workspace/proxmox/newvm jammy-cloudinit-4g ${CLOUDINIT} ${CLOUDINIT}.yml
+./workspace/proxmox/waitforhost ${CLOUDINIT}.home.arpa

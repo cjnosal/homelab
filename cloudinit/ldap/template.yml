@@ -251,4 +251,12 @@ packages:
 - sssd-tools
 runcmd:
 #@yaml/text-templated-strings
-- /root/runcmd (@= data.values.placeholdercred @)
+- |
+  /root/runcmd \
+    (@= data.values.placeholderadmincred @) \
+    (@= data.values.placeholderusercred @) \
+    (@= data.values.username @) \
+    (@= data.values.givenname @) \
+    (@= data.values.surname @) \
+    (@= data.values.email @)
+

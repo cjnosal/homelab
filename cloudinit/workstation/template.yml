@@ -5,7 +5,7 @@
 ---
 users:
 - name: #@ data.values.username
-  gecos: #@ data.values.fullname
+  gecos: #@ "{} {}".format(data.values.givenname, data.values.surname)
   groups: sudo
   shell: /bin/bash
   sudo: ['ALL=(ALL) NOPASSWD:ALL']

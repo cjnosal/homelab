@@ -20,7 +20,7 @@ write_files:
     db-username=keycloak
 
     # The password of the database user.
-    db-password=(@= data.values.placeholdercred @)
+    db-password=(@= data.values.placeholderdbcred @)
 
     # The full database JDBC URL. If not provided, a default URL is set based on the selected database vendor.
     db-url=jdbc:postgresql://localhost/keycloak
@@ -63,7 +63,7 @@ write_files:
     Type=notify
     NotifyAccess=all
     Environment=KEYCLOAK_ADMIN=admin
-    Environment=KEYCLOAK_ADMIN_PASSWORD=(@= data.values.placeholdercred @)
+    Environment=KEYCLOAK_ADMIN_PASSWORD=(@= data.values.placeholderadmincred @)
     ExecStart=/opt/keycloak/bin/kc.sh start --optimized --log=console,file --log-file=/var/log/keycloak/keycloak.log
     SuccessExitStatus=0 143
 
@@ -160,4 +160,4 @@ packages:
 - jq
 runcmd:
 #@yaml/text-templated-strings
-- /root/runcmd (@= data.values.placeholdercred @)
+- /root/runcmd (@= data.values.placeholderadmincred @) (@= data.values.placeholderdbcred @)
