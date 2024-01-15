@@ -64,6 +64,9 @@ or manually:
 In an incognito window browse to https://keycloak.home.arpa:8443/realms/infrastructure/account/#/
 Sign in with an LDAP user
 
+#### Verify access to admin console
+LDAP users in the `keycloak-realm-admin` group can manage the infrastructure realm:
+https://keycloak.home.arpa:8443/admin/infrastructure/console/#/
 
 ## generate clients from the CLI
 ```
