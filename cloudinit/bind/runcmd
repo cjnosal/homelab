@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ZONE=home.arpa
+
+chgrp bind /etc/bind/reverse.${ZONE}
+chgrp bind /etc/bind/forward.${ZONE}
+chgrp bind /etc/bind/named.conf.local
+chgrp bind /etc/bind/named.conf.options
+systemctl enable named
+systemctl start named

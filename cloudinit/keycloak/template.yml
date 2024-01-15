@@ -147,6 +147,11 @@ write_files:
      -s 'config."access.token.claim"=true'
 
     /opt/keycloak/bin/kcadm.sh get clients/$CID -r ${REALM} --fields=secret | jq -r '.secret'
+- path: /root/runcmd
+  owner: root:root
+  permissions: '0750'
+  #@yaml/text-templated-strings
+  content: #@ data.values.runcmd
 packages:
 - openjdk-19-jre-headless
 - postgresql
@@ -154,41 +159,5 @@ packages:
 - postgresql-contrib
 - jq
 runcmd:
-- wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
-- tar -xf keycloak-22.0.0.tar.gz
-- addgroup keycloak
-- adduser --system keycloak
-- adduser keycloak keycloak
-- mv keycloak-22.0.0 /opt/keycloak
-- rm keycloak-22.0.0.tar.gz
-- mv /run/keycloak.conf /opt/keycloak/conf/keycloak.conf
-- chown -R keycloak /opt/keycloak
-- wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
-- wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
-- systemctl start postgresql.service
-- sudo -u postgres createuser keycloak
-- sudo -u postgres createdb keycloak
 #@yaml/text-templated-strings
-- sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '(@= data.values.placeholdercred @)';"
-- /opt/keycloak/bin/kc.sh build --db=postgres
-- snap install --classic certbot
-- ln -s /snap/bin/certbot /usr/bin/certbot
-- export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-- echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
-#@yaml/text-templated-strings
-- certbot certonly --standalone --server (@= data.values.acme @) --register-unsafely-without-email --cert-name (@= data.values.hostname @).(@= data.values.zone @) -d (@= data.values.hostname @).(@= data.values.zone @) 
-#@yaml/text-templated-strings
-- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/fullchain.pem /opt/keycloak/conf/server.crt.pem
-#@yaml/text-templated-strings
-- ln -s /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)/privkey.pem /opt/keycloak/conf/server.key.pem 
-- chgrp -R keycloak /etc/letsencrypt
-- chmod g+rx /etc/letsencrypt/archive
-#@yaml/text-templated-strings
-- chmod g+rx /etc/letsencrypt/archive/(@= data.values.hostname @).(@= data.values.zone @)
-- chmod g+rx /etc/letsencrypt/live
-#@yaml/text-templated-strings
-- chmod g+rx /etc/letsencrypt/live/(@= data.values.hostname @).(@= data.values.zone @)
-- chmod 640 /opt/keycloak/conf/*.pem
-- systemctl daemon-reload
-- systemctl enable keycloak
-- systemctl start keycloak
+- /root/runcmd (@= data.values.placeholdercred @)

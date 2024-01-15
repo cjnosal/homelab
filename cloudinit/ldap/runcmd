@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLACEHOLDER_CRED=$1
+ZONE=home.arpa
+SUFFIX='dc=home,dc=arpa'
+
+debconf-set-selections <<EOF
+  slapd slapd/internal/generated_adminpw password $PLACEHOLDER_CRED
+  slapd slapd/password2 password $PLACEHOLDER_CRED
+  slapd slapd/internal/adminpw password $PLACEHOLDER_CRED
+  slapd slapd/password1 password $PLACEHOLDER_CRED
+  slapd slapd/domain string ${ZONE}
+  slapd shared/organization string homelab
+EOF
+
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes slapd
+
+export CERT_GROUP=openldap
+export CHAIN_PATH=/etc/ldap/ca.pem
+export PRIVKEY_PATH=/etc/ldap/key.pem
+export CERT_PATH=/etc/ldap/cert.pem
+initcertbot ldap.${ZONE}
+
+ldapmodify -Y EXTERNAL -H ldapi:/// -f /run/certinfo.ldif
+ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {2}to dn.subtree="${SUFFIX}" by dn.exact=gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth manage by * break
+EOF
+
+hostnamectl set-hostname ldap.${ZONE}
+
+systemctl restart sssd.service
+systemctl restart slapd
+
+ldapadd -H ldapi:/// -f /run/org.ldif -Y EXTERNAL
+addldapgroup keycloak-realm-admin
+addldapgroup step-admin
+addldapgroup step-provisioner-admin
+addldapgroup vault-user
+addldapgroup vault-admin
+addldapgroup ssh-ops

@@ -149,86 +149,25 @@ write_files:
     xinputExtensionDev: False
     overlayStderr:  True
     authWarningSlack:   20
-- path: /etc/skel/.profile
+- path: /etc/skel/.homelab
   owner: root:root
   permissions: '0644'
   #@yaml/text-templated-strings
   content: |
-    # ~/.profile: executed by the command interpreter for login shells.
-    # This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
-    # exists.
-    # see /usr/share/doc/bash/examples/startup-files for examples.
-    # the files are located in the bash-doc package.
-
-    # the default umask is set in /etc/profile; for setting the umask
-    # for ssh logins, install and configure the libpam-umask package.
-    #umask 022
-
-    # if running bash
-    if [ -n "$BASH_VERSION" ]; then
-        # include .bashrc if it exists
-        if [ -f "$HOME/.bashrc" ]; then
-            . "$HOME/.bashrc"
-        fi
-    fi
-
-    # set PATH so it includes user's private bin if it exists
-    if [ -d "$HOME/bin" ] ; then
-        PATH="$HOME/bin:$PATH"
-    fi
-
-    # set PATH so it includes user's private bin if it exists
-    if [ -d "$HOME/.local/bin" ] ; then
-        PATH="$HOME/.local/bin:$PATH"
-    fi
-
-    # Homelab setup
-
     export VAULT_ADDR=https://vault.home.arpa:8200
+    if [[ ! -d ~/.step ]]
+    then
+      step ca bootstrap --ca-url https://step.home.arpa --install --fingerprint $(curl -fSsL https://step.home.arpa:8443/fingerprint)
+    fi
+- path: /root/runcmd
+  owner: root:root
+  permissions: '0750'
+  #@yaml/text-templated-strings
+  content: #@ data.values.runcmd
 packages:
  - bind9utils
  - dnsutils
  - jq
  - openjdk-19-jre-headless
 runcmd:
- - growpart /dev/sda 1
- - resize2fs /dev/sda1
- #@yaml/text-templated-strings
- - |
-  debconf-set-selections <<EOF
-    nslcd nslcd/ldap-reqcert string demand
-    nslcd nslcd/ldap-uris string ldaps://ldap.home.arpa/
-    nslcd nslcd/ldap-base string dc=home,dc=arpa
-    nslcd nslcd/ldap-cacertfile string /etc/ssl/certs/ca-certificates.crt
-    nslcd nslcd/ldap-auth-type string none
-
-    ldap-auth-config ldap-auth-config/ldapns/ldap_version string 3
-    ldap-auth-config ldap-auth-config/ldapns/base-dn string dc=home,dc=arpa
-    ldap-auth-config ldap-auth-config/ldapns/ldap-server string ldaps://ldap.home.arpa
-    ldap-auth-config ldap-auth-config/move-to-debconf boolean true
-    ldap-auth-config ldap-auth-config/dbrootlogin boolean false
-    ldap-auth-config ldap-auth-config/dblogin boolean false
-
-  EOF
- - wget --progress=dot:giga https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
- - wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
- - dpkg -i step-cli_0.24.4_amd64.deb
- - wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
- - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
- - apt-get update
- - apt-get install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
- - service xrdp restart
- - sudo systemctl enable nslcd
- - systemctl start nslcd
- - wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
- - tar -xf keycloak-22.0.0.tar.gz
- - mv keycloak-22.0.0/bin/* /usr/local/bin/
- - rm keycloak-22.0.0.tar.gz
- - sudo -u cnosal step ca bootstrap --ca-url https://step.home.arpa --install --fingerprint $(curl -fSsL https://step.home.arpa:8443/fingerprint)
- - curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
- - curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8443/step_intermediate_ca.crt
- - mkdir -p /etc/firefox/ca-certificates
- - chmod a+rx /etc/firefox/ca-certificates
- - cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
- - chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
- - shutdown -r +1
+- /root/runcmd

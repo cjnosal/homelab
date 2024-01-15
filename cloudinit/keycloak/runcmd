@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLACEHOLDER_CRED=$1
+export ZONE=home.arpa
+
+wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
+tar -xf keycloak-22.0.0.tar.gz
+addgroup keycloak
+adduser --system keycloak
+adduser keycloak keycloak
+mv keycloak-22.0.0 /opt/keycloak
+rm keycloak-22.0.0.tar.gz
+mv /run/keycloak.conf /opt/keycloak/conf/keycloak.conf
+chown -R keycloak /opt/keycloak
+wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
+wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
+systemctl start postgresql.service
+sudo -u postgres createuser keycloak
+sudo -u postgres createdb keycloak
+sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$PLACEHOLDER_CRED';"
+/opt/keycloak/bin/kc.sh build --db=postgres
+
+export CERT_GROUP=keycloak
+export FULLCHAIN_PATH=/opt/keycloak/conf/server.crt.pem
+export PRIVKEY_PATH=/opt/keycloak/conf/server.key.pem
+initcertbot keycloak.${ZONE}
+
+systemctl enable keycloak
+systemctl start keycloak

@@ -130,7 +130,66 @@ write_files:
     curl -fSsL -X POST https://vault.home.arpa:8200/v1/ssh-host-signer/sign/hostrole -H"X-Vault-Token: $VAULT_TOKEN" \
       --data "{\"public_key\":\"$PUB_KEY\",\"cert_type\":\"host\"}" | jq -r .data.signed_key > /etc/ssh/ssh_host_rsa_key-cert.pub
     rm -f /etc/ssh_host_role_id
+- path: /usr/local/bin/gettlsca
+  owner: root:root
+  permissions: '0750'
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
+    sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8443/step_intermediate_ca.crt
 
+    sudo chmod -R a+r /usr/local/share/ca-certificates/*.crt
+    sudo update-ca-certificates
+- path: /usr/local/bin/initcertbot
+  owner: root:root
+  permissions: '0750'
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    ACME=https://step.home.arpa/acme/acme/directory
+    SAN=$1
+
+    snap install --classic certbot
+    ln -s /snap/bin/certbot /usr/bin/certbot
+    export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+    certbot certonly --standalone --server $ACME --register-unsafely-without-email --cert-name ${SAN} -d ${SAN}
+    chmod g+rx /etc/letsencrypt/archive
+    chmod g+rx /etc/letsencrypt/archive/${SAN}
+    chmod g+rx /etc/letsencrypt/live
+    chmod g+rx /etc/letsencrypt/live/${SAN}
+    if [[ -n "${FULLCHAIN_PATH:-}" ]]
+    then
+      mkdir -p $(dirname $FULLCHAIN_PATH)
+      rm -rf $FULLCHAIN_PATH
+      ln -s /etc/letsencrypt/live/${SAN}/fullchain.pem $FULLCHAIN_PATH
+      chmod 640 $FULLCHAIN_PATH
+    fi
+    if [[ -n "${CHAIN_PATH:-}" ]]
+    then
+      mkdir -p $(dirname $CHAIN_PATH)
+      rm -rf $CHAIN_PATH
+      ln -s /etc/letsencrypt/live/${SAN}/chain.pem $CHAIN_PATH
+      chmod 640 $CHAIN_PATH
+    fi
+    if [[ -n "${CERT_PATH:-}" ]]
+    then
+      mkdir -p $(dirname $CERT_PATH)
+      rm -rf $CERT_PATH
+      ln -s /etc/letsencrypt/live/${SAN}/cert.pem $CERT_PATH
+      chmod 640 $CERT_PATH
+    fi
+    if [[ -n "${PRIVKEY_PATH:-}" ]]
+    then
+      mkdir -p $(dirname $PRIVKEY_PATH)
+      rm -rf $PRIVKEY_PATH
+      ln -s /etc/letsencrypt/live/${SAN}/privkey.pem $PRIVKEY_PATH
+      chmod 640 $PRIVKEY_PATH
+    fi
+    chgrp -R $CERT_GROUP /etc/letsencrypt
+    chgrp -R $CERT_GROUP /etc/letsencrypt/archive/${SAN}/
 runcmd:
 - /usr/local/bin/getsshcert
 - /usr/local/bin/getsshclientca

@@ -16,4 +16,4 @@ export YTT_reverse_zone=${YTT_reverse_cidr}in-addr.arpa
 export YTT_subnet=$(cut -d'.' -f 1-3 <<< $YTT_ip)
 export YTT_last=$(cut -d'.' -f 4 <<< $YTT_ip)
 
-write_snippet bind.yml -f ${SCRIPT_DIR}/bind-template.yml
+write_snippet bind.yml -f ${SCRIPT_DIR}/template.yml

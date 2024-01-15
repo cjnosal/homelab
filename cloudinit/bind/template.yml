@@ -144,15 +144,14 @@ write_files:
     named-checkzone ${ZONE} /etc/bind/forward.${ZONE}
 
     sudo rndc reload
+- path: /root/runcmd
+  owner: root:root
+  permissions: '0755'
+  content: #@ data.values.runcmd
 packages:
  - bind9
  - bind9utils
  - bind9-doc
  - dnsutils
-runcmd:
-  - #@ "chgrp bind /etc/bind/reverse.{}".format(data.values.zone)
-  - #@ "chgrp bind /etc/bind/forward.{}".format(data.values.zone)
-  - chgrp bind /etc/bind/named.conf.local
-  - chgrp bind /etc/bind/named.conf.options
-  - systemctl enable named
-  - systemctl start named
+runcmd: 
+- /root/runcmd
