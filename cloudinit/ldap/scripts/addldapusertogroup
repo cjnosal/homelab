@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+USER_UID=$1
+GROUP_CN=$2
+SUFFIX=dc=home,dc=arpa
+ZONE=home.arpa
+source /usr/local/include/ldapauthhelper
+USER_DN=$(ldapsearch -H ldaps://ldap.${ZONE} -x "(uid=${USER_UID})" dn | grep dn: | awk '{print $2}')
+cat << EOF > /tmp/${USER_UID}_${GROUP_CN}.ldif
+dn: cn=${GROUP_CN},ou=Groups,${SUFFIX}
+changetype: modify
+add: member
+member: $USER_DN
+EOF
+ldapadd -H ldaps://ldap.${ZONE} -f /tmp/${USER_UID}_${GROUP_CN}.ldif $AUTH_ARGS

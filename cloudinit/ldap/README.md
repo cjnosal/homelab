@@ -41,7 +41,7 @@ sudo addldapusertogroup $uid $cn
 * ssh-ops: issue SSH certs for principal `ops`
 
 ### designate ldap user as admin
-`/usr/local/bin/addldapadmin $USER_DN`
+`addldapusertogroup $uid ldap-admin`
 
 ## set user temporary password
 

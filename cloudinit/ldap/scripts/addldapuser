@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+USER_UID=$1
+GIVEN_NAME=$2
+SURNAME=$3
+EMAIL=$4
+OU=${5:-People}
+SUFFIX=dc=home,dc=arpa
+ZONE=home.arpa
+cat << EOF > /tmp/${USER_UID}.ldif
+dn: uid=${USER_UID},ou=${OU},${SUFFIX}
+objectClass: inetOrgPerson
+uid: ${USER_UID}
+sn: $SURNAME
+givenName: $GIVEN_NAME
+cn: $GIVEN_NAME
+displayName: $GIVEN_NAME $SURNAME
+mail: $EMAIL
+EOF
+
+source /usr/local/include/ldapauthhelper
+ldapadd -H ldaps://ldap.${ZONE} -f /tmp/${USER_UID}.ldif $AUTH_ARGS

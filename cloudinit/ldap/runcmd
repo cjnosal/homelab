@@ -29,11 +29,21 @@ export CERT_PATH=/etc/ldap/cert.pem
 initcertbot ldap.${ZONE}
 
 ldapmodify -Y EXTERNAL -H ldapi:/// -f /run/certinfo.ldif
+
+#! admins can reset passwords
 ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
 dn: olcDatabase={1}mdb,cn=config
 changetype: modify
 add: olcAccess
-olcAccess: {2}to dn.subtree="${SUFFIX}" by dn.exact=gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth manage by * break
+olcAccess: {0}to dn.subtree="${SUFFIX}" attrs=userPassword by group.exact="cn=ldap-admin,ou=groups,${SUFFIX}" =w by * break
+EOF
+
+#! admins can manage org
+ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {3}to dn.subtree="${SUFFIX}" by group.exact="cn=ldap-admin,ou=groups,${SUFFIX}" manage by * break
 EOF
 
 hostnamectl set-hostname ldap.${ZONE}
@@ -41,13 +51,19 @@ hostnamectl set-hostname ldap.${ZONE}
 systemctl restart sssd.service
 systemctl restart slapd
 
-ldapadd -H ldapi:/// -f /run/org.ldif -Y EXTERNAL
+
+export LDAP_BIND_DN="cn=admin,${SUFFIX}"
+export LDAP_BIND_PW="$PLACEHOLDER_ADMIN_CRED"
+
+ldapadd -H ldapi:/// -f /run/org.ldif -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW"
+
 addldapgroup keycloak-realm-admin
 addldapgroup step-admin
 addldapgroup step-provisioner-admin
 addldapgroup vault-user
 addldapgroup vault-admin
 addldapgroup ssh-ops
+addldapgroup ldap-admin
 
 # initial admin
 addldapuser $USERNAME $USER_GIVEN_NAME $USER_SURNAME $USER_EMAIL
@@ -58,7 +74,6 @@ addldapusertogroup $USERNAME step-provisioner-admin
 addldapusertogroup $USERNAME vault-user
 addldapusertogroup $USERNAME vault-admin
 addldapusertogroup $USERNAME ssh-ops
+addldapusertogroup $USERNAME ldap-admin
 
-addldapadmin uid=${USERNAME},ou=People,${SUFFIX}
-
-ldappasswd -x -D cn=admin,${SUFFIX} -w $PLACEHOLDER_ADMIN_CRED -s $PLACEHOLDER_USER_CRED -S uid=${USERNAME},ou=people,${SUFFIX}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $PLACEHOLDER_USER_CRED -S uid=${USERNAME},ou=people,${SUFFIX}

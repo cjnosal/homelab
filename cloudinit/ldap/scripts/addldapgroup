@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+CN=$1
+SUFFIX=dc=home,dc=arpa
+ZONE=home.arpa
+cat << EOF > /tmp/${CN}.ldif
+dn: cn=${CN},ou=Groups,${SUFFIX}
+objectClass: groupOfNames
+cn: ${CN}
+member: uid=dummy,${SUFFIX}
+EOF
+
+source /usr/local/include/ldapauthhelper
+ldapadd -H ldaps://ldap.${ZONE} -f /tmp/${CN}.ldif $AUTH_ARGS
