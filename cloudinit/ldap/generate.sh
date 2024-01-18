@@ -12,8 +12,8 @@ export YTT_zone="home.arpa"
 export YTT_suffix="dc=home,dc=arpa"
 
 write_snippet ldap.yml -f ${SCRIPT_DIR}/template.yml \
-  --data-value-file placeholderadmincred=${SCRIPT_DIR}/../ldap_admin.passwd \
-  --data-value-file placeholderusercred=${SCRIPT_DIR}/../user.passwd \
+  --data-value-file placeholderadmincred=${SCRIPT_DIR}/../../creds/ldap_admin.passwd \
+  --data-value-file placeholderusercred=${SCRIPT_DIR}/../../creds/user.passwd \
   --data-value-file ldapauthhelper=${SCRIPT_DIR}/scripts/ldapauthhelper \
   --data-value-file addldapgroup=${SCRIPT_DIR}/scripts/addldapgroup \
   --data-value-file addldapsystem=${SCRIPT_DIR}/scripts/addldapsystem \

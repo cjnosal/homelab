@@ -11,27 +11,27 @@ function write_snippet {
 	echo '#cloud-config' > /var/lib/vz/snippets/$FILENAME # ytt can't write comments
 
 	CA_ARGS=""
-	if [[ -f ${SCRIPT_DIR}/../step_root_ca.pem ]]
+	if [[ -f ${SCRIPT_DIR}/../../creds/step_root_ca.pem ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${SCRIPT_DIR}/../step_root_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${SCRIPT_DIR}/../../creds/step_root_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../step_intermediate_ca.pem ]]
+	if [[ -f ${SCRIPT_DIR}/../../creds/step_intermediate_ca.pem ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${SCRIPT_DIR}/../step_intermediate_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${SCRIPT_DIR}/../../creds/step_intermediate_ca.pem"
 	fi
 
 	VAULT_ARGS=""
-	if [[ -f ${SCRIPT_DIR}/../vault_host_ssh_ca.pem ]]
+	if [[ -f ${SCRIPT_DIR}/../../creds/vault_host_ssh_ca.pem ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_host_ssh_ca=${SCRIPT_DIR}/../vault_host_ssh_ca.pem"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_host_ssh_ca=${SCRIPT_DIR}/../../creds/vault_host_ssh_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../vault_client_ssh_ca.pem ]]
+	if [[ -f ${SCRIPT_DIR}/../../creds/vault_client_ssh_ca.pem ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_client_ssh_ca=${SCRIPT_DIR}/../vault_client_ssh_ca.pem"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_client_ssh_ca=${SCRIPT_DIR}/../../creds/vault_client_ssh_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../ssh_host_role_id ]]
+	if [[ -f ${SCRIPT_DIR}/../../creds/ssh_host_role_id ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file ssh_host_role_id=${SCRIPT_DIR}/../ssh_host_role_id"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file ssh_host_role_id=${SCRIPT_DIR}/../../creds/ssh_host_role_id"
 	fi
 
 	ytt -f ${SCRIPT_DIR}/../base-user-data.yml \

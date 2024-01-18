@@ -2,8 +2,14 @@
 set -euo pipefail
 
 PLACEHOLDER_ADMIN_CRED=$1
-PLACEHOLDER_DB_CRED=$2
 export ZONE=home.arpa
+
+function generatecred {
+  (tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c 16
+}
+export -f generatecred
+
+DB_CRED=$(generatecred)
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 tar -xf keycloak-22.0.0.tar.gz
@@ -12,14 +18,14 @@ adduser --system keycloak
 adduser keycloak keycloak
 mv keycloak-22.0.0 /opt/keycloak
 rm keycloak-22.0.0.tar.gz
-mv /run/keycloak.conf /opt/keycloak/conf/keycloak.conf
+sed "s/db-password=/db-password=${DB_CRED}/" /run/keycloak.conf > /opt/keycloak/conf/keycloak.conf
 chown -R keycloak /opt/keycloak
 wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
 wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
 systemctl start postgresql.service
 sudo -u postgres createuser keycloak
 sudo -u postgres createdb keycloak
-sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$PLACEHOLDER_DB_CRED';"
+sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$DB_CRED';"
 /opt/keycloak/bin/kc.sh build --db=postgres
 
 export CERT_GROUP=keycloak
@@ -36,8 +42,6 @@ do
 	echo waiting for keycloak
 	sleep 2
 done
-
-#/opt/keycloak/bin/kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm master --user admin --password ${PLACEHOLDER_CRED}
 
 create-realm admin ${PLACEHOLDER_ADMIN_CRED} infrastructure
 

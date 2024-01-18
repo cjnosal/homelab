@@ -90,15 +90,15 @@ Revoke token by accessor:
 On the Proxmox node:
 * create a VM template with the vault role id for signing host certs
 ```
-vault read --field role_id auth/approle/role/ssh-host-role/role-id > /root/workspace/cloudinit/ssh_host_role_id
+vault read --field role_id auth/approle/role/ssh-host-role/role-id > /root/workspace/creds/ssh_host_role_id
 /root/workspace/proxmox/img2template jammy-cloudinit-4g jammy-cloudinit-4g.img
 # or scp ssh_host_role_id ubuntu@host:/tmp/ssh_host_role_id && sudo mv /tmp/ssh_host_role_id /etc/
 ```
 
 * retrieve the CA PEMs (will be consumed by cloudinit generation)
 ```
-curl -fSsL -o /root/workspace/cloudinit/vault_host_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-host-signer/public_key
-curl -fSsL -o /root/workspace/cloudinit/vault_client_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
+curl -fSsL -o /root/workspace/creds/vault_host_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-host-signer/public_key
+curl -fSsL -o /root/workspace/creds/vault_client_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
 ```
 
 
