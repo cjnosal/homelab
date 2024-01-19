@@ -110,6 +110,21 @@ write_files:
         ]
       }
     }
+- path: /usr/lib/thunderbird/distribution/policies.json
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    {
+      "policies": {
+        "Certificates": {
+          "ImportEnterpriseRoots": true,
+          "Install": [
+            "/usr/local/share/ca-certificates/step_root_ca.crt"
+          ]
+        }
+      }
+    }
 - path: /etc/skel/.xscreensaver
   owner: root:root
   permissions: '0644'
@@ -189,5 +204,6 @@ packages:
  - dnsutils
  - jq
  - openjdk-19-jre-headless
+ - thunderbird
 runcmd:
 - /root/runcmd

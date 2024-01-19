@@ -68,6 +68,14 @@ addldapgroup ldap-admin
 # initial admin
 addldapuser $USERNAME $USER_GIVEN_NAME $USER_SURNAME $USER_EMAIL
 
+# mail
+# postmaster/abuse mailbox
+addldapuser webmaster Web Master webmaster@home.arpa
+# sent to non-existent account
+addldapuser catchall Catch All catchall@home.arpa
+# service account
+addldapuser mailbot Mail Bot mailbot@home.arpa
+
 addldapusertogroup $USERNAME keycloak-realm-admin
 addldapusertogroup $USERNAME step-admin
 addldapusertogroup $USERNAME step-provisioner-admin

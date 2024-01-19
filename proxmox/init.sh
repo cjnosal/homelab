@@ -263,6 +263,8 @@ export CORES=4
 
 ./workspace/proxmox/waitforhost workstation.home.arpa"
 
+./workspace/proxmox/preparevm mail
+
 # prompt
 echo
 echo Bootstrap complete - use the username you selected in cloudinit/user.yml and this temporary password to log in to workstation.home.arpa:

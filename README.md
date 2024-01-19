@@ -26,4 +26,5 @@ then run bootstrap.sh
 * OIDC (keycloak)
 * SSH CA (Vault)
 * Secret management (Vault)
-* Workstation (Lubuntu + xrdp + firefox)
+* Mail (postfix + dovecot)
+* Workstation (Lubuntu + xrdp + firefox + thunderbird)

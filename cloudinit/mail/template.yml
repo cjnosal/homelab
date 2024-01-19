@@ -1,0 +1,422 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:overlay", "overlay")
+#@overlay/match by=overlay.all,expects="0+"
+#@overlay/match-child-defaults missing_ok=True
+---
+write_files:
+- path: /root/runcmd
+  owner: root:root
+  permissions: '0750'
+  #@yaml/text-templated-strings
+  content: #@ data.values.runcmd
+- path: /etc/mailname
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    mail.home.arpa
+- path: /etc/postfix/main.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    # See /usr/share/postfix/main.cf.dist for a commented, more complete version
+
+    # Debian specific:  Specifying a file name will cause the first
+    # line of that file to be used as the name.  The Debian default
+    # is /etc/mailname.
+    #myorigin = /etc/mailname
+
+    smtpd_banner = $myhostname ESMTP
+    biff = no
+
+    # appending .domain is the MUA's job.
+    append_dot_mydomain = no
+
+    # Uncomment the next line to generate "delayed mail" warnings
+    #delay_warning_time = 4h
+
+    readme_directory = no
+
+    # See http://www.postfix.org/COMPATIBILITY_README.html -- default to 3.6 on
+    # fresh installs.
+    compatibility_level = 3.6
+
+    # TLS parameters
+    smtpd_tls_ask_ccert = yes
+    smtpd_tls_cert_file=/etc/ssl/certs/tls.crt
+    smtpd_tls_key_file=/etc/ssl/private/tls.key
+    smtpd_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+    smtpd_tls_security_level=may
+    smtpd_tls_ciphers = high
+    smtpd_tls_loglevel = 1
+    smtpd_tls_session_cache_timeout = 3600s
+    smtpd_tls_auth_only = yes
+    smtpd_tls_received_header = yes
+    smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+    tls_random_source = dev:/dev/urandom
+
+    smtp_tls_CApath=/etc/ssl/certs
+    smtp_tls_security_level=may
+    smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+    smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+    myhostname = mail.home.arpa
+    alias_maps = hash:/etc/aliases
+    alias_database = hash:/etc/aliases
+    myorigin = /etc/mailname
+    mydestination = $myhostname, mail.home.arpa, localhost.home.arpa, localhost
+    relayhost =
+    mynetworks = 127.0.0.0/8 192.168.2.0/23 [::ffff:127.0.0.0]/104 [::1]/128
+    mailbox_size_limit = 0
+    recipient_delimiter = +
+    inet_interfaces = all
+    inet_protocols = all
+
+    mailbox_command = /usr/lib/dovecot/deliver -c /etc/dovecot/conf.d/999-mail-stack-delivery.conf -m "${EXTENSION}"
+
+    smtpd_sasl_auth_enable = yes
+    smtpd_sasl_authenticated_header = yes
+    smtpd_sasl_path = private/dovecot-auth
+    smtpd_sasl_security_options = noanonymous
+    smtpd_sasl_local_domain = $myhostname
+    smtpd_sasl_type = dovecot
+
+    smtpd_helo_required = yes
+    smtpd_helo_restrictions = permit_mynetworks, reject_non_fqdn_helo_hostname, reject_invalid_helo_hostname, reject_unknown_helo_hostname, permit
+    smtpd_recipient_restrictions = reject_unknown_client_hostname, reject_unknown_sender_domain, reject_unknown_recipient_domain, reject_unauth_pipelining, permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, reject_invalid_hostname, reject_non_fqdn_sender
+    smtpd_sender_restrictions = reject_unknown_sender_domain, reject_sender_login_mismatch
+    smtpd_sender_login_maps = ldap:/etc/postfix/ldap-senders.cf
+
+    ## Dealing with rejection: use permanent 550 errors to stop retries
+    unknown_address_reject_code = 550
+    unknown_hostname_reject_code = 550
+    unknown_client_reject_code = 550
+
+    ## Customized Dovecot and virtual user-specific settings
+    canonical_maps = hash:/etc/postfix/canonical
+    home_mailbox = Maildir/
+    message_size_limit = 104857600
+    virtual_alias_maps = hash:/etc/postfix/virtual, ldap:/etc/postfix/ldap-aliases.cf
+    virtual_mailbox_domains = hash:/etc/postfix/virtual-mailbox-domains
+    virtual_mailbox_maps = ldap:/etc/postfix/ldap-accounts.cf
+    virtual_transport = dovecot
+
+    ## This setting will generate an error if you restart Postfix before
+    ## adding the appropriate service definition in master.cf, so make
+    ## sure to get that taken care of!
+    dovecot_destination_recipient_limit = 1
+
+    ## Customized milter settings
+    #milter_default_action = accept
+    #milter_connect_macros = j {daemon_name} v {if_name} _
+    #non_smtpd_milters = $smtpd_milters
+    #smtpd_milters = unix:/spamass/spamass.sock unix:/clamav/clamav-milter.ctl
+    #   unix:/opendkim/opendkim.sock
+
+    ## Other customized mail server settings
+    default_destination_concurrency_limit = 5
+    disable_vrfy_command = yes
+    relay_destination_concurrency_limit = 1
+    smtp_tls_note_starttls_offer = yes
+    smtp_tls_security_level = may
+- path: /etc/postfix/ldap-senders.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    server_host = ldaps://ldap.home.arpa
+    server_port = 636
+    version = 3
+    bind = no
+    search_base = dc=home,dc=arpa
+    scope = sub
+    query_filter = (&(objectClass=inetOrgPerson)(|(uid=%u)(mail=%s)))
+    result_attribute = uid
+- path: /etc/postfix/ldap-accounts.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    server_host = ldaps://ldap.home.arpa
+    server_port = 636
+    version = 3
+    bind = no
+    search_base = dc=home,dc=arpa
+    scope = sub
+    query_filter = (&(objectClass=inetOrgPerson)(|(uid=%u)(mail=%s)))
+    result_attribute = mail
+- path: /etc/postfix/ldap-aliases.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    server_host = ldaps://ldap.home.arpa
+    server_port = 636
+    version = 3
+    bind = no
+    search_base = dc=home,dc=arpa
+    scope = sub
+    query_filter = (&(objectClass=inetOrgPerson)(|(uid=%u)(mail=%s)))
+    result_attribute = mail
+- path: /etc/postfix/master.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    #
+    # Postfix master process configuration file.  For details on the format
+    # of the file, see the master(5) manual page (command: "man 5 master" or
+    # on-line: http://www.postfix.org/master.5.html).
+    #
+    # Do not forget to execute "postfix reload" after editing this file.
+    #
+    # ==========================================================================
+    # service type  private unpriv  chroot  wakeup  maxproc command + args
+    #               (yes)   (yes)   (no)    (never) (100)
+    # ==========================================================================
+    smtp      inet  n       -       y       -       -       smtpd
+    #smtp      inet  n       -       y       -       1       postscreen
+    #smtpd     pass  -       -       y       -       -       smtpd
+    #dnsblog   unix  -       -       y       -       0       dnsblog
+    #tlsproxy  unix  -       -       y       -       0       tlsproxy
+    # Choose one: enable submission for loopback clients only, or for any client.
+    #127.0.0.1:submission inet n -   y       -       -       smtpd
+    submission inet n       -       y       -       -       smtpd
+    #  -o syslog_name=postfix/submission
+    #  -o smtpd_tls_security_level=encrypt
+    #  -o smtpd_sasl_auth_enable=yes
+    #  -o smtpd_tls_auth_only=yes
+    #  -o smtpd_reject_unlisted_recipient=no
+    #  -o smtpd_client_restrictions=$mua_client_restrictions
+    #  -o smtpd_helo_restrictions=$mua_helo_restrictions
+    #  -o smtpd_sender_restrictions=$mua_sender_restrictions
+    #  -o smtpd_recipient_restrictions=
+    #  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+    #  -o milter_macro_daemon_name=ORIGINATING
+    # Choose one: enable smtps for loopback clients only, or for any client.
+    #127.0.0.1:smtps inet n  -       y       -       -       smtpd
+    #smtps     inet  n       -       y       -       -       smtpd
+    #  -o syslog_name=postfix/smtps
+    #  -o smtpd_tls_wrappermode=yes
+    #  -o smtpd_sasl_auth_enable=yes
+    #  -o smtpd_reject_unlisted_recipient=no
+    #  -o smtpd_client_restrictions=$mua_client_restrictions
+    #  -o smtpd_helo_restrictions=$mua_helo_restrictions
+    #  -o smtpd_sender_restrictions=$mua_sender_restrictions
+    #  -o smtpd_recipient_restrictions=
+    #  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+    #  -o milter_macro_daemon_name=ORIGINATING
+    #628       inet  n       -       y       -       -       qmqpd
+    pickup    unix  n       -       y       60      1       pickup
+    cleanup   unix  n       -       y       -       0       cleanup
+    qmgr      unix  n       -       n       300     1       qmgr
+    #qmgr     unix  n       -       n       300     1       oqmgr
+    tlsmgr    unix  -       -       y       1000?   1       tlsmgr
+    rewrite   unix  -       -       y       -       -       trivial-rewrite
+    bounce    unix  -       -       y       -       0       bounce
+    defer     unix  -       -       y       -       0       bounce
+    trace     unix  -       -       y       -       0       bounce
+    verify    unix  -       -       y       -       1       verify
+    flush     unix  n       -       y       1000?   0       flush
+    proxymap  unix  -       -       n       -       -       proxymap
+    proxywrite unix -       -       n       -       1       proxymap
+    smtp      unix  -       -       y       -       -       smtp
+    relay     unix  -       -       y       -       -       smtp
+            -o syslog_name=postfix/$service_name
+    #       -o smtp_helo_timeout=5 -o smtp_connect_timeout=5
+    showq     unix  n       -       y       -       -       showq
+    error     unix  -       -       y       -       -       error
+    retry     unix  -       -       y       -       -       error
+    discard   unix  -       -       y       -       -       discard
+    local     unix  -       n       n       -       -       local
+    virtual   unix  -       n       n       -       -       virtual
+    lmtp      unix  -       -       y       -       -       lmtp
+    anvil     unix  -       -       y       -       1       anvil
+    scache    unix  -       -       y       -       1       scache
+    postlog   unix-dgram n  -       n       -       1       postlogd
+    #
+    # ====================================================================
+    # Interfaces to non-Postfix software. Be sure to examine the manual
+    # pages of the non-Postfix software to find out what options it wants.
+    #
+    # Many of the following services use the Postfix pipe(8) delivery
+    # agent.  See the pipe(8) man page for information about ${recipient}
+    # and other message envelope options.
+    # ====================================================================
+    #
+    # maildrop. See the Postfix MAILDROP_README file for details.
+    # Also specify in main.cf: maildrop_destination_recipient_limit=1
+    #
+    maildrop  unix  -       n       n       -       -       pipe
+      flags=DRXhu user=vmail argv=/usr/bin/maildrop -d ${recipient}
+
+    # ====================================================================
+    #
+    # See the Postfix UUCP_README file for configuration details.
+    #
+    uucp      unix  -       n       n       -       -       pipe
+      flags=Fqhu user=uucp argv=uux -r -n -z -a$sender - $nexthop!rmail ($recipient)
+    #
+    # Other external delivery methods.
+    #
+    ifmail    unix  -       n       n       -       -       pipe
+      flags=F user=ftn argv=/usr/lib/ifmail/ifmail -r $nexthop ($recipient)
+    bsmtp     unix  -       n       n       -       -       pipe
+      flags=Fq. user=bsmtp argv=/usr/lib/bsmtp/bsmtp -t$nexthop -f$sender $recipient
+    scalemail-backend unix -       n       n       -       2       pipe
+      flags=R user=scalemail argv=/usr/lib/scalemail/bin/scalemail-store ${nexthop} ${user} ${extension}
+    mailman   unix  -       n       n       -       -       pipe
+      flags=FRX user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py ${nexthop} ${user}
+    dovecot   unix  -       n       n       -       -       pipe
+      flags=DRhu user=vmail:vmail argv=/usr/lib/dovecot/deliver -f ${sender} -d ${recipient}
+- path: /etc/aliases
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    postmaster: webmaster@home.arpa
+    root: webmaster@home.arpa
+    www-data: webmaster@home.arpa
+- path: /etc/postfix/canonical
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    #! override default from address of local service accounts
+    #! e.g.
+    #! www-data@home.arpa myservice@home.arpa
+- path: /etc/postfix/virtual-mailbox-domains
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    home.arpa    OK
+- path: /etc/postfix/virtual
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    catchall@home.arpa   catchall@home.arpa
+    webmaster@home.arpa  webmaster@home.arpa
+    postmaster@home.arpa webmaster@home.arpa
+    root@mail.home.arpa  webmaster@home.arpa
+    root@home.arpa       webmaster@home.arpa
+    abuse@home.arpa      webmaster@home.arpa
+    hostmaster@home.arpa webmaster@home.arpa
+    @home.arpa           catchall@home.arpa
+- path: /etc/dovecot/conf.d/999-mail-stack-delivery.conf #! later overrides earlier
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    # Some general options
+    protocols = imap
+    ssl = yes
+    #ssl_cert = </etc/ssl/private/ssl-chain-mail-yourdomain.pem
+    #ssl_key = </etc/ssl/private/ssl-key-decrypted-mail-yourdomain.key
+    ssl_client_ca_dir = /etc/ssl/certs
+    ssl_cipher_list = ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AES:RSA+3DES:!ADH:!AECDH:!MD5:!DSS
+    mail_home = /var/mail/vmail/%d/%n
+    mail_location = maildir:/var/mail/vmail/%d/%n/mail:LAYOUT=fs
+    auth_username_chars = abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890.-_@
+
+    # IMAP configuration
+    protocol imap {
+      mail_max_userip_connections = 10
+      imap_client_workarounds = delay-newmail tb-extra-mailbox-sep
+    }
+
+    # LDA configuration
+    protocol lda {
+      postmaster_address = postmaster@home.arpa
+      quota_full_tempfail = yes
+      deliver_log_format = msgid=%m: %$
+      rejection_reason = Your message to <%t> was automatically rejected:%n%r
+    }
+
+    # Authentication configuration
+    auth_mechanisms = plain login
+
+    # Log all failed authentication attempts
+    auth_verbose=yes
+
+    service auth {
+      # Postfix smtp-auth
+      unix_listener /var/spool/postfix/private/dovecot-auth {
+      mode = 0660
+      user = postfix
+      group = postfix
+      }
+    }
+
+    # temporary imapc stuff for gmail mail migration
+    #imapc_host = imap.gmail.com
+    #imapc_port = 993
+    #imapc_ssl = imaps
+    #imapc_features = rfc822.size
+    #imapc_features = $imapc_features fetch-headers
+    #mail_prefetch_count = 20
+
+    # autosubscribe to folders
+    namespace inbox {
+      mailbox Drafts {
+        special_use = \Drafts
+        auto = subscribe
+      }
+      mailbox Junk {
+        special_use = \Junk
+        auto = subscribe
+       }
+      mailbox Trash {
+        special_use = \Trash
+        auto = subscribe
+      }
+      mailbox Sent {
+        special_use = \Sent
+        auto = subscribe
+        }
+    }
+
+- path: /etc/dovecot/conf.d/10-auth.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    auth_mechanisms = plain
+    !include auth-ldap.conf.ext
+- path: /etc/dovecot/conf.d/auth-ldap.conf.ext
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    passdb {
+      driver = ldap
+      args = /etc/dovecot/dovecot-ldap.conf.ext
+    }
+
+    userdb {
+      driver = static
+      args = uid=5000 gid=5000 home=/var/mail/vmail/home.arpa/%n domain=home.arpa
+    }
+
+    userdb {
+      driver = ldap
+      args = /etc/dovecot/dovecot-ldap.conf.ext
+    }
+- path: /etc/dovecot/dovecot-ldap.conf.ext
+  owner: root:root
+  permissions: '0600'
+  #@yaml/text-templated-strings
+  content: |
+    uris = ldaps://ldap.home.arpa
+    auth_bind = yes
+    auth_bind_userdn = uid=%n,ou=people,dc=home,dc=arpa
+    base = dc=home,dc=arpa
+    user_filter = (&(objectClass=inetOrgPerson)(|(uid=%n)(mail=%u)))
+    iterate_filter = (objectClass=inetOrgPerson)
+    debug_level = 0
+    pass_filter = (&(objectClass=inetOrgPerson)(|(uid=%n)(mail=%u)))
+
+runcmd:
+- /root/runcmd
