@@ -18,7 +18,8 @@ DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" 
   postfix postfix-ldap mariadb-server \
   dovecot-core dovecot-imapd dovecot-mysql dovecot-ldap \
   swaks opendkim opendkim-tools \
-  spamass-milter pyzor razor libmail-dkim-perl
+  spamass-milter pyzor razor libmail-dkim-perl \
+  clamav clamav-daemon clamdscan python3-pip
 
 # generate postfix .db files
 newaliases
@@ -80,3 +81,24 @@ service spamassassin restart && service spamass-milter restart
 razor-admin -home=/var/lib/spamassassin/.razor -register
 razor-admin -home=/var/lib/spamassassin/.razor -create
 razor-admin -home=/var/lib/spamassassin/.razor -discover
+
+
+# clamav setup
+mkdir /var/spool/postfix/clamav
+chown clamav:root /var/spool/postfix/clamav/
+
+pip install cvdupdate
+cvdupdate update
+cp /root/.cvdupdate/database/* /var/lib/clamav
+chown -R clamav:clamav /var/lib/clamav
+
+service clamav-daemon restart
+systemctl is-active clamav-daemon --wait
+
+DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
+  clamav-freshclam clamav-milter arj bzip2 cabextract cpio file gzip lhasa lzop nomarch p7zip pax rar rpm unrar unzip zip
+
+service clamav-milter restart
+
+
+service postfix reload

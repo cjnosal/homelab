@@ -111,7 +111,7 @@ write_files:
     milter_default_action = accept
     milter_connect_macros = j {daemon_name} v {if_name} _
     non_smtpd_milters = $smtpd_milters
-    smtpd_milters = unix:/opendkim/opendkim.sock unix:/spamass/spamass.sock #unix:/clamav/clamav-milter.ctl
+    smtpd_milters = unix:/opendkim/opendkim.sock unix:/spamass/spamass.sock unix:/clamav/clamav-milter.ctl
 
     ## Other customized mail server settings
     default_destination_concurrency_limit = 5
@@ -582,5 +582,42 @@ write_files:
     use_engines            = 4,8
     whitelist              = razor-whitelist
     razorhome = /var/lib/spamassassin/.razor
+- path: /etc/clamav/clamav-milter.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    MilterSocket /var/spool/postfix/clamav/clamav-milter.ctl
+    FixStaleSocket true
+    User clamav
+    ReadTimeout 120
+    Foreground false
+    PidFile /var/run/clamav/clamav-milter.pid
+    ClamdSocket unix:/var/run/clamav/clamd.ctl
+    OnClean Accept
+    OnInfected Accept
+    OnFail Defer
+    AddHeader Replace
+    LogSyslog false
+    LogFacility LOG_MAIL
+    LogVerbose false
+    LogInfected Off
+    LogClean Off
+    LogRotate true
+    MaxFileSize 25M
+    SupportMultipleRecipients false
+    TemporaryDirectory /tmp
+    LogFile /var/log/clamav/clamav-milter.log
+    LogTime true
+    LogFileUnlock false
+    LogFileMaxSize 1M
+    MilterSocketGroup clamav
+    MilterSocketMode 666
+- path: /etc/default/clamav-milter
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    SOCKET_RWGROUP=postfix
 runcmd:
 - /root/runcmd
