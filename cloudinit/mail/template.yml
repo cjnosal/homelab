@@ -329,9 +329,22 @@ write_files:
     # LDA configuration
     protocol lda {
       postmaster_address = postmaster@home.arpa
+      mail_plugins = sieve
       quota_full_tempfail = yes
       deliver_log_format = msgid=%m: %$
       rejection_reason = Your message to <%t> was automatically rejected:%n%r
+    }
+
+    protocol lmtp {
+      mail_plugins = $mail_plugins sieve
+    }
+
+    # Plugins configuration
+    plugin {
+      sieve=~/.dovecot.sieve
+      sieve_dir=~/sieve
+      sieve_before = /var/mail/vmail/sieve-before
+      sieve_after = /var/mail/vmail/sieve-after
     }
 
     # Authentication configuration
@@ -374,7 +387,10 @@ write_files:
       mailbox Sent {
         special_use = \Sent
         auto = subscribe
-        }
+      }
+      mailbox Infected {
+        auto = subscribe
+      }
     }
 
 - path: /etc/dovecot/conf.d/10-auth.conf
@@ -619,5 +635,36 @@ write_files:
   #@yaml/text-templated-strings
   content: |
     SOCKET_RWGROUP=postfix
+- path: /var/mail/vmail/sieve-before/default.sieve
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    require ["envelope", "fileinto", "imap4flags", "regex"];
+
+    # Discard spam higher than level 10
+    if header :contains "X-Spam-Level" "**********" {
+      discard;
+      stop;
+    }
+
+    # Trash messages with improperly formed message IDs
+    if not header :regex "message-id" ".*@.*\\." {
+      discard;
+      stop;
+    }
+
+    # File spam higher than level 5
+    if header :contains "X-Spam-Level" "*****" {
+      fileinto "INBOX.Junk";
+      setflag "\\Seen";
+      stop;
+    }
+
+    # File infected messages
+    if header :contains "X-Virus-Status" "Infected" {
+      fileinto "INBOX.Infected";
+      stop;
+    }
 runcmd:
 - /root/runcmd
