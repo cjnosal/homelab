@@ -17,7 +17,8 @@ EOF
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
   postfix postfix-ldap mariadb-server \
   dovecot-core dovecot-imapd dovecot-mysql dovecot-ldap \
-  swaks opendkim opendkim-tools
+  swaks opendkim opendkim-tools \
+  spamass-milter pyzor razor libmail-dkim-perl
 
 # generate postfix .db files
 newaliases
@@ -57,3 +58,25 @@ chown opendkim:root /var/spool/postfix/opendkim
 usermod -G opendkim postfix
 
 service opendkim restart
+
+
+# spamassassin setup
+usermod -a -G debian-spamd spamass-milter
+mkdir /var/spool/postfix/spamassassin/
+chown debian-spamd:root /var/spool/postfix/spamassassin/
+
+spamassassin --lint
+sa-update
+sa-compile
+
+mkdir -p /var/lib/spamassassin/.spamassassin
+mkdir -p /var/lib/spamassassin/.razor
+mkdir -p /var/lib/spamassassin/.pyzor
+chown -R debian-spamd:debian-spamd /var/lib/spamassassin
+
+service spamassassin restart && service spamass-milter restart
+
+# hash-sharing DB for spam messages
+razor-admin -home=/var/lib/spamassassin/.razor -register
+razor-admin -home=/var/lib/spamassassin/.razor -create
+razor-admin -home=/var/lib/spamassassin/.razor -discover

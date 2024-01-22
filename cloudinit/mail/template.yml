@@ -111,7 +111,7 @@ write_files:
     milter_default_action = accept
     milter_connect_macros = j {daemon_name} v {if_name} _
     non_smtpd_milters = $smtpd_milters
-    smtpd_milters = unix:/opendkim/opendkim.sock #unix:/spamass/spamass.sock unix:/clamav/clamav-milter.ctl
+    smtpd_milters = unix:/opendkim/opendkim.sock unix:/spamass/spamass.sock #unix:/clamav/clamav-milter.ctl
 
     ## Other customized mail server settings
     default_destination_concurrency_limit = 5
@@ -496,5 +496,91 @@ write_files:
     SigningTable            refile:/etc/opendkim/SigningTable
 
     TemporaryDirectory      /var/tmp
+- path: /etc/default/spamassassin
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    SAHOME="/var/lib/spamassassin"
+    SAGLOBALCFGPATH="/etc/spamassassin"
+
+    # Change to one to enable spamd
+    ENABLED=1
+
+    # Options
+    # See man spamd for possible options. The -d option is automatically added.
+    OPTIONS="-x --max-children 5 --helper-home-dir /var/lib/spamassassin -u debian-spamd -g debian-spamd --siteconfigpath /etc/spamassassin --socketpath=/var/spool/postfix/spamassassin/spamd.sock --socketowner=debian-spamd --socketgroup=debian-spamd --socketmode=0660"
+
+    # Pid file
+    # Where should spamd write its PID to file? If you use the -u or
+    # --username option above, this needs to be writable by that user.
+    # Otherwise, the init script will not be able to shut spamd down.
+    PIDFILE="/var/run/spamd.pid"
+
+    # Cronjob
+    # Set to anything but 0 to enable the cron job to automatically update
+    # spamassassin's rules on a nightly basis
+    CRON=1
+- path: /etc/default/spamass-milter
+  owner: root:root
+  permissions: '0644'
+  #! -i ignores from our server, -I ignores authenticated smtp senders
+  #@yaml/text-templated-strings
+  content: |
+    OPTIONS="-u spamass-milter -i 127.0.0.1 -m -I -- --socket=/var/spool/postfix/spamassassin/spamd.sock"
+- path: /etc/spamassassin/init.pre
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    # URIDNSBL - look up URLs found in the message against several DNS
+    # blocklists.
+    #
+    loadplugin Mail::SpamAssassin::Plugin::URIDNSBL
+
+    # SPF - perform SPF verification.
+    #
+    loadplugin Mail::SpamAssassin::Plugin::SPF
+
+    ## Add TextCat to assist enable language-based filtering
+    #
+    loadplugin Mail::SpamAssassin::Plugin::TextCat
+- path: /etc/spamassassin/local.cf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    ## Force global Bayesian databases instead of per-user
+    bayes_path /var/lib/spamassassin/.spamassassin/bayes
+    bayes_file_mode 0777
+
+    ## Ensure non-English e-mails are treated as spam
+    ok_languages en
+    ok_locales en
+
+    ## Set Pyzor & Razor config file paths
+    razor_config /var/lib/spamassassin/.razor/razor-agent.conf
+    pyzor_options --homedir /var/lib/spamassassin/.pyzor
+- path: /var/lib/spamassassin/.razor/razor-agent.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    debuglevel             = 3
+    identity               = identity
+    ignorelist             = 0
+    listfile_catalogue     = servers.catalogue.lst
+    listfile_discovery     = servers.discovery.lst
+    listfile_nomination    = servers.nomination.lst
+    logfile                = razor-agent.log
+    logic_method           = 4
+    min_cf                 = ac
+    razordiscovery         = discovery.razor.cloudmark.com
+    rediscovery_wait       = 172800
+    report_headers         = 1
+    turn_off_discovery     = 0
+    use_engines            = 4,8
+    whitelist              = razor-whitelist
+    razorhome = /var/lib/spamassassin/.razor
 runcmd:
 - /root/runcmd

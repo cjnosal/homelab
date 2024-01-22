@@ -25,3 +25,8 @@ swaks --to $recipient --server mail.home.arpa:25 --tls --from $sender --auth-use
 
 ### opendkim
 opendkim-testkey -d home.arpa -s mail -k /etc/opendkim/mail.private -v
+
+### spam training
+
+sa-learn ham --progress $inboxfolder
+sa-learn spam --progress $spamfolder
