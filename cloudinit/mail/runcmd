@@ -17,7 +17,7 @@ EOF
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
   postfix postfix-ldap mariadb-server \
   dovecot-core dovecot-imapd dovecot-mysql dovecot-ldap \
-  swaks
+  swaks opendkim opendkim-tools
 
 # generate postfix .db files
 newaliases
@@ -43,3 +43,17 @@ ln -s /etc/ssl/private/tls.key /etc/dovecot/private/dovecot.key
 ln -s /etc/ssl/certs/tls.crt /etc/dovecot/private/dovecot.pem
 
 service dovecot restart
+
+
+# dkim setup
+opendkim-genkey -r -h sha256 -d mail.${ZONE} -s mail --directory /etc/opendkim
+ln -s /etc/opendkim/mail.private /etc/opendkim/mail
+chmod 400 /etc/opendkim/mail.private
+
+chown -R opendkim:opendkim /etc/opendkim
+
+mkdir /var/spool/postfix/opendkim
+chown opendkim:root /var/spool/postfix/opendkim
+usermod -G opendkim postfix
+
+service opendkim restart

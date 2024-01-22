@@ -264,6 +264,18 @@ export CORES=4
 ./workspace/proxmox/waitforhost workstation.home.arpa"
 
 ./workspace/proxmox/preparevm mail
+DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
+sudo cat /etc/opendkim/mail.txt
+EOF
+)"
+
+ssh ubuntu@bind.home.arpa bash << EOF
+set -euo pipefail
+echo "home.arpa. IN MX 10 mail.home.arpa." | sudoappend /etc/bind/forward.home.arpa
+echo '$DKIM' | sudoappend /etc/bind/forward.home.arpa
+echo 'home.arpa.  IN TXT "v=spf1 mx a ?all"' | sudoappend /etc/bind/forward.home.arpa
+sudo rndc reload
+EOF
 
 # prompt
 echo

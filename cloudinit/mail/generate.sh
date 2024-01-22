@@ -7,5 +7,6 @@ source $SCRIPT_DIR/../generate-utils.sh
 
 export YTT_ip=$1
 export YTT_hostname=mail
+export YTT_zone=home.arpa
 
 write_snippet mail.yml  -f ${SCRIPT_DIR}/template.yml

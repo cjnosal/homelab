@@ -22,3 +22,6 @@ doveadm auth login
 
 ### postfix+ldap
 swaks --to $recipient --server mail.home.arpa:25 --tls --from $sender --auth-user $sender --auth-password $password
+
+### opendkim
+opendkim-testkey -d home.arpa -s mail -k /etc/opendkim/mail.private -v
