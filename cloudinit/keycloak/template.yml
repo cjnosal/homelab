@@ -109,7 +109,16 @@ write_files:
     fi
 
     ./kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm $authrealm --user $username --password $password
-    ./kcadm.sh create realms -s enabled=true -s realm=${realm}
+    ./kcadm.sh create realms -s enabled=true -s realm=${realm} \
+      -s verifyEmail=true \
+      -s 'smtpServer.host=mail.home.arpa' \
+      -s 'smtpServer.starttls=true' \
+      -s 'smtpServer.auth=false' \
+      -s 'smtpServer.fromDisplayName=Keycloak' \
+      -s 'smtpServer.from=keycloak@home.arpa' \
+      -s 'smtpServer.replyToDisplayName=no-reply' \
+      -s 'smtpServer.replyTo=no-reply@home.arpa' \
+      -s 'smtpServer.envelopeFrom=keycloak@home.arpa'
 
     REALM_ID=$(./kcadm.sh get realms/${realm} --fields id | jq -r .id)
     LDAP_ID=$(./kcadm.sh create components -r ${realm} \
