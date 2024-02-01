@@ -28,6 +28,15 @@ or
 `ssh ubuntu@${BIND_IP} aliashost.sh $HOST_ALIAS $CANONICAL_FQDN.`
 e.g. `ssh ubuntu@${BIND_IP} aliashost.sh foo bar.home.arpa.`
 
+## Remote Dynamic Updates
+
+Remote clients can update DNS records with a shared key, e.g. for certbot DNS01 challenges.
+
+Generate a tsig key
+`tsig-keygen -a hmac-sha512 k8s-core-cert-manager >> /etc/bind/named.conf.tsigkeys`
+
+Grant the tsig key access
+`add-update-policy.sh "grant cert-manager name _acme-challenge.pinniped.home.arpa txt;"`
 
 ## Add all Proxmox VMs and Containers
 On PVE Node:

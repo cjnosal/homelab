@@ -3,9 +3,14 @@ set -euo pipefail
 
 ZONE=home.arpa
 
-chgrp bind /etc/bind/reverse.${ZONE}
-chgrp bind /etc/bind/forward.${ZONE}
+touch /etc/bind/named.conf.tsigkeys
+chmod 440 /etc/bind/named.conf.tsigkeys
+
+chgrp bind /var/lib/bind/reverse.${ZONE}
+chgrp bind /var/lib/bind/forward.${ZONE}
 chgrp bind /etc/bind/named.conf.local
 chgrp bind /etc/bind/named.conf.options
+chgrp bind /etc/bind/named.conf.tsigkeys
+
 systemctl enable named
 systemctl start named

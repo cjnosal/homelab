@@ -26,6 +26,7 @@ ssh-add ~/.ssh/vm
 
 # prepare service vms
 ./workspace/proxmox/preparevm --vmname bind --skip_domain -- --nameserver 192.168.3.1
+./workspace/proxmox/waitforhost bind.home.arpa
 
 ssh ubuntu@bind.home.arpa addhost.sh pve 192.168.2.200
 
@@ -131,8 +132,7 @@ EOF
 CONFIG="--ca-url https://step.home.arpa --admin-subject=step --password-file /etc/step-ca/password.txt \
   --admin-provisioner cert-provisioner"
 
-ssh ubuntu@step.home.arpa bash -euo pipefail << EOF
-sudo su
+ssh ubuntu@step.home.arpa sudo bash << EOF
 set -euo pipefail
 export STEPPATH=/etc/step-ca
 
@@ -145,6 +145,33 @@ step ca admin add step-admin cert-provisioner --super=true  $CONFIG
 step ca provisioner update keycloak --admin=step-provisioner-admin  $CONFIG
 
 sudo systemctl restart step-ca
+EOF
+
+./workspace/proxmox/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
+
+./workspace/proxmox/preparevm --vmname mail
+DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
+sudo cat /etc/opendkim/mail.txt | cut -d'(' -f2 | cut -d')' -f1 | xargs
+EOF
+)"
+
+ssh ubuntu@bind.home.arpa bash << EOF
+set -euo pipefail
+sudo nsupdate -l -4 <<EOD
+zone home.arpa
+update add home.arpa. 60 MX 10 mail.home.arpa.
+update add mail._domainkey.home.arpa 60 TXT $DKIM
+update add home.arpa. 60 TXT "v=spf1 mx a ?all"
+send
+EOD
+
+EOF
+
+## sync dns journal to config
+ssh ubuntu@bind.home.arpa bash << EOF
+set -euo pipefail
+sudo rndc sync home.arpa
+sudo rndc sync 2.168.192.in-addr.arpa
 EOF
 
 # rotate creds
@@ -246,22 +273,6 @@ then
   exit 1
 fi
 echo "$NEW_KEYCLOAK_PASSWORD" > ./workspace/creds/keycloak_admin.passwd
-
-./workspace/proxmox/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
-
-./workspace/proxmox/preparevm --vmname mail
-DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
-sudo cat /etc/opendkim/mail.txt
-EOF
-)"
-
-ssh ubuntu@bind.home.arpa bash << EOF
-set -euo pipefail
-echo "home.arpa. IN MX 10 mail.home.arpa." | sudoappend /etc/bind/forward.home.arpa
-echo '$DKIM' | sudoappend /etc/bind/forward.home.arpa
-echo 'home.arpa.  IN TXT "v=spf1 mx a ?all"' | sudoappend /etc/bind/forward.home.arpa
-sudo rndc reload
-EOF
 
 # prompt
 echo

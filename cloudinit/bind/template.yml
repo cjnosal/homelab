@@ -4,6 +4,15 @@
 #@overlay/match-child-defaults missing_ok=True
 ---
 write_files:
+- path: /etc/bind/named.conf
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    include "/etc/bind/named.conf.options";
+    include "/etc/bind/named.conf.local";
+    include "/etc/bind/named.conf.default-zones";
+    include "/etc/bind/named.conf.tsigkeys";
 - path: /etc/bind/named.conf.options
   owner: root:root
   permissions: '0644'
@@ -28,15 +37,25 @@ write_files:
   content: |
     zone "(@= data.values.zone @)" IN {
             type master;
-            file "/etc/bind/forward.(@= data.values.zone @)";
-            allow-update { none; };
+            file "/var/lib/bind/forward.(@= data.values.zone @)";
+            include "/etc/bind/named.conf.update-policy";
     };
     zone "(@= data.values.reverse_zone @)" IN {
             type master;
-            file "/etc/bind/reverse.(@= data.values.zone @)";
-            allow-update { none; };
+            file "/var/lib/bind/reverse.(@= data.values.zone @)";
+            update-policy {
+              grant local-ddns zonesub any;
+            };
     };
-- path: #@ "/etc/bind/forward.{}".format(data.values.zone)
+- path: /etc/bind/named.conf.update-policy
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    update-policy {
+      grant local-ddns zonesub any;
+    };
+- path: #@ "/var/lib/bind/forward.{}".format(data.values.zone)
   owner: root:root
   permissions: '0644'
   #@yaml/text-templated-strings
@@ -64,7 +83,7 @@ write_files:
 
     ;CNAME Record
     ;ftp IN CNAME www.(@= data.values.zone @).
-- path: #@ "/etc/bind/reverse.{}".format(data.values.zone)
+- path: #@ "/var/lib/bind/reverse.{}".format(data.values.zone)
   owner: root:root
   permissions: '0644'
   #@yaml/text-templated-strings
@@ -105,22 +124,68 @@ write_files:
 
     ZONE=(@= data.values.zone @)
 
-    echo $HOST IN A $IP | sudoappend /etc/bind/forward.${ZONE}
+    sudo nsupdate -l -4 <<EOF
+    zone $ZONE
+    update add ${HOST}.${ZONE} 60 A $IP
+    send
+    EOF
 
-    segment=$(cut -d'.' -f4 <<< "$IP")
+    named-checkzone ${ZONE} /var/lib/bind/forward.${ZONE}
 
-    echo $segment IN PTR ${HOST}.${ZONE}. | sudoappend /etc/bind/reverse.${ZONE}
+    if ! grep -q '*' <<< $HOST
+    then
+      REV_ZONE=(@= data.values.reverse_zone @)
+      segment=$(cut -d'.' -f4 <<< "$IP")
 
-    named-checkzone ${ZONE} /etc/bind/forward.${ZONE}
-    named-checkzone ${ZONE} /etc/bind/reverse.${ZONE}
+      sudo nsupdate -l -4 <<EOF
+      zone $REV_ZONE
+    update add ${segment}.${REV_ZONE} 60 PTR ${HOST}.${ZONE}
+    send
+    EOF
 
-    sudo rndc reload
-    while [[ -z "$(dig ${HOST}.${ZONE} @localhost +noall +answer)" ]]
+      named-checkzone ${REV_ZONE} /var/lib/bind/reverse.${ZONE}
+    fi
+
+    while [[ -z "$(dig -4 ${HOST}.${ZONE} @localhost +noall +answer)" ]]
     do
       sleep 2
       echo retry
     done
-    echo resolving ${HOST}.${ZONE} to $(dig ${HOST}.${ZONE} @localhost +noall +answer)
+    echo resolving ${HOST}.${ZONE} to $(dig -4 ${HOST}.${ZONE} @localhost +noall +answer)
+- path: /usr/local/bin/removehost.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    HOST=$1
+    IP=$2
+
+    ZONE=(@= data.values.zone @)
+    REV_ZONE=(@= data.values.reverse_zone @)
+
+    sudo nsupdate -l -4 <<EOF
+    zone $ZONE
+    update delete ${HOST}.${ZONE}
+    send
+    EOF
+
+    named-checkzone ${ZONE} /var/lib/bind/forward.${ZONE}
+
+    if ! grep -q '*' <<< $HOST
+    then
+      REV_ZONE=(@= data.values.reverse_zone @)
+      segment=$(cut -d'.' -f4 <<< "$IP")
+
+      sudo nsupdate -l -4 <<EOF
+      zone $REV_ZONE
+    update delete ${segment}.${REV_ZONE}
+    send
+    EOF
+      named-checkzone ${REV_ZONE} /var/lib/bind/reverse.${ZONE}
+    fi
 - path: /usr/local/bin/aliashost.sh
   owner: root:root
   permissions: '0755'
@@ -139,10 +204,22 @@ write_files:
       CANONICAL_FQDN="$CANONICAL_FQDN."
     fi
 
-    echo $HOST_ALIAS IN CNAME $CANONICAL_FQDN | sudoappend /etc/bind/forward.${ZONE}
+    sudo nsupdate -l -4 <<EOF
+    zone $ZONE
+    update add ${HOST_ALIAS}.${ZONE} 60 CNAME $CANONICAL_FQDN
+    send
+    EOF
 
-    named-checkzone ${ZONE} /etc/bind/forward.${ZONE}
+    named-checkzone ${ZONE} /var/lib/bind/forward.${ZONE}
+- path: /usr/local/bin/add-update-policy.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
 
+    sed -i.bk$(date +%s) "s/};/  $@\n};/" /etc/bind/named.conf.update-policy
     sudo rndc reload
 - path: /root/runcmd
   owner: root:root
