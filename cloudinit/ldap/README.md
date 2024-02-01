@@ -8,7 +8,7 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 
 ```
 ./workspace/cloudinit/ldap/generate.sh $IP
-./workspace/proxmox/newvm jammy-cloudinit-4g ldap ldap.yml
+./workspace/proxmox/newvm --vmname ldap --userdata ldap.yml --ip $IP
 ```
 
 ## change the placeholder admin password!

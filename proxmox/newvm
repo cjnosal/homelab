@@ -1,74 +1,84 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# create a new vm from the provided template
-
-TEMPLATE_NAME=$1
-VMNAME=$2
-
-USERDATA=""
-if [ $# -gt 2 ]
-then
-	USERDATA=$3
-fi
-
-MEMORY=${MEMORY:-4096}
-CORES=${CORES:-2}
-DISK0=${DISK0:-""}
-NAMESERVER=${NAMESERVER:-$(dig +noall +answer bind.home.arpa | awk '{print $5}')}
-IP=${IP:-""}
-
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-TEMPLATE_ID=$($SCRIPT_DIR/findvm $TEMPLATE_NAME)
+# create a new vm from the provided template
+
+# defaults
+memory=${memory:-4096}
+cores=${cores:-2}
+nameserver=${nameserver:-$(dig -4 +noall +answer bind.home.arpa | awk '{print $5}')}
+template_name=${template_name:-"jammy-cloudinit-4g"}
+
+OPTIONS=(template_name vmname userdata memory cores disk nameserver ip)
+
+help_this="create a new vm"
+help_template_name="name of the VM template to clone (default jammy-cloudinit-4g)"
+help_vmname="unique name for the new VM"
+help_userdata="filename of the cloudinit user data configuration in the proxmox snippets directory"
+help_memory="RAM to allocate in MB (default 4096)"
+help_cores="CPU cores to allocate (default 2)"
+help_disk="boot disk size in GB (default matches template)"
+help_nameserver="IP address of DNS resolver (default bind.home.arpa)"
+help_ip="IP address of new VM (default will reuse address of {vmname}.home.arpa if present in DNS, otherwise increment available IP)"
+
+source ${SCRIPT_DIR}/../cloudinit/argshelper
+
+parseargs $@
+requireargs template_name vmname
+
+
+TEMPLATE_ID=$($SCRIPT_DIR/findvm $template_name)
 VMID=$($SCRIPT_DIR/ids next)
 
-if [[ -z "$IP" ]]
+if [[ -z "$ip" ]]
 then
-	DNS=$(dig ${VMNAME}.home.arpa +noall +answer)
+	DNS=$(dig -4 ${vmname}.home.arpa +noall +answer)
 	if [[ -n "$DNS" ]]
 	then
-		IP=$(awk '{print $5}' <<< "$DNS") # reuse IP when recreating a VM
+		ip=$(awk '{print $5}' <<< "$DNS") # reuse ip when recreating a VM
 	else
-		IP=$($SCRIPT_DIR/ips next) # find available IP address for new VM
+		ip=$($SCRIPT_DIR/ips next) # find available IP address for new VM
 	fi
 fi
 
-qm clone $TEMPLATE_ID $VMID --name $VMNAME
-qm set $VMID --ipconfig0 ip=${IP}/23,gw=192.168.3.1
+qm clone $TEMPLATE_ID $VMID --name $vmname
+qm set $VMID --ipconfig0 ip=${ip}/23,gw=192.168.3.1
 
 qm set $VMID --cpu host
-qm set $VMID --cores $CORES
-qm set $VMID --memory $MEMORY
+qm set $VMID --cores $cores
+qm set $VMID --memory $memory
 
 qm set $VMID --searchdomain home.arpa
-qm set $VMID --nameserver ${NAMESERVER}
+qm set $VMID --nameserver ${nameserver}
 
-if [[ -n "$USERDATA" ]]
+if [[ -n "$userdata" ]]
 then
-    qm set $VMID --cicustom "user=local:snippets/${USERDATA}" # use provided cloudinit config
+    qm set $VMID --cicustom "user=local:snippets/${userdata}" # use provided cloudinit config
 else
 	qm set $VMID --sshkey /root/.ssh/vm.pub # always add default ssh key
 fi
 
-if [[ -n "$DISK0" ]]
+if [[ -n "$disk" ]]
 then
-	qm disk resize $VMID scsi0 $DISK0
+	qm disk resize $VMID scsi0 ${disk}G
 fi
 
 qm start $VMID
 
-ssh-keygen -f ~/.ssh/known_hosts -R $IP
+ssh-keygen -f ~/.ssh/known_hosts -R $ip
+ssh-keygen -f ~/.ssh/known_hosts -R ${vmname}.home.arpa
 
-while ! ssh-keyscan -H $IP >> ~/.ssh/known_hosts
+while ! ssh-keyscan -H $ip >> ~/.ssh/known_hosts
 do
   echo waiting for ssh
   sleep 2
 done
 
-ssh -i /root/.ssh/vm ubuntu@${IP} tail -f /var/log/cloud-init-output.log &
+ssh -i /root/.ssh/vm ubuntu@${ip} tail -f /var/log/cloud-init-output.log &
 RESULT=0
-if ! ssh -i /root/.ssh/vm ubuntu@${IP} cloud-init status --wait > /dev/null
+if ! ssh -i /root/.ssh/vm ubuntu@${ip} cloud-init status --wait > /dev/null
 then
   echo "cloudinit failed"
   RESULT=1

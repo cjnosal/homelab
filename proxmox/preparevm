@@ -1,16 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CLOUDINIT=$1
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-echo set up ${CLOUDINIT}
-export IP=$(./workspace/proxmox/ips next)
+FLAGS=(skip_domain)
+OPTIONS=(vmname userdata)
 
-if [[ "${SKIP_DOMAIN:-}" != "true" ]]
+help_this="create a new vm with automatic ip and dns. passthrough args to newvm"
+help_skip_domain="do not add DNS records for this host"
+help_vmname="unique name for the new VM"
+help_userdata="filename of the cloudinit user data configuration in the proxmox snippets directory"
+
+source ${SCRIPT_DIR}/../cloudinit/argshelper
+
+parseargs $@
+requireargs vmname
+
+userdata=${userdata:-$vmname}
+
+echo set up ${vmname}
+export ip=$(./workspace/proxmox/ips next)
+
+if [[ "${skip_domain:-}" != "1" ]]
 then
-  ssh ubuntu@bind.home.arpa addhost.sh ${CLOUDINIT} $IP
+  ssh ubuntu@bind.home.arpa addhost.sh ${vmname} $ip
 fi
 
-./workspace/cloudinit/${CLOUDINIT}/generate.sh $IP
-./workspace/proxmox/newvm jammy-cloudinit-4g ${CLOUDINIT} ${CLOUDINIT}.yml
-./workspace/proxmox/waitforhost ${CLOUDINIT}.home.arpa
+./workspace/cloudinit/${userdata}/generate.sh $ip
+./workspace/proxmox/newvm --vmname ${vmname} --userdata ${userdata}.yml ${PASSTHROUGH[@]}
+
+if [[ "${skip_domain:-}" != "1" ]]
+then
+  ./workspace/proxmox/waitforhost ${vmname}.home.arpa
+fi

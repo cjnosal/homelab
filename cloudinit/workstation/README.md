@@ -5,11 +5,8 @@ Provisions a user and comes with required client tools in the lubuntu desktop en
 
 ```
 export IP=$(./workspace/proxmox/ips next)
-export DISK0=32G
-export MEMORY=8192
-export CORES=4
 ./workspace/cloudinit/workstation/generate.sh $username $displayname
-./workspace/proxmox/newvm jammy-cloudinit-4g workstation workstation.yml
+./workspace/proxmox/newvm --vmname workstation --userdata workstation.yml --disk 32 --memory 8192 --cores 4 --ip $IP
 ```
 
 ## Connect

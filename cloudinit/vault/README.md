@@ -8,7 +8,7 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 
 ```
 ./workspace/cloudinit/vault/generate.sh $IP
-./workspace/proxmox/newvm jammy-cloudinit-4g vault vault.yml
+./workspace/proxmox/newvm --vmname vault --userdata vault.yml --ip $IP
 ```
 
 ## configure LDAP
@@ -29,7 +29,7 @@ vault login -no-print -method=oidc role=ssh-ops username=$USER
 ## configure OIDC
 in keycloak:
 ```
-CLIENT_SECRET=$(/usr/local/bin/create-client -s clientId=vault \
+CLIENT_SECRET=$(/usr/local/bin/create-client -- -s clientId=vault \
 	-s 'redirectUris=["https://vault.home.arpa:8250/oidc/callback","https://vault.home.arpa:8200/ui/vault/auth/oidc/oidc/callback"]')
 ```
 

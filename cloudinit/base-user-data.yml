@@ -190,6 +190,10 @@ write_files:
     fi
     chgrp -R $CERT_GROUP /etc/letsencrypt
     chgrp -R $CERT_GROUP /etc/letsencrypt/archive/${SAN}/
+- path: /usr/local/include/argshelper
+  owner: root:root
+  permissions: '0755'
+  content: #@ data.values.argscmd
 runcmd:
 - /usr/local/bin/getsshcert
 - /usr/local/bin/getsshclientca

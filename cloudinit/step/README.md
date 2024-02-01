@@ -8,7 +8,7 @@ nameserver bind.home.arpa
 ```
 export IP=$(./workspace/proxmox/ips next)
 ./workspace/cloudinit/step/generate.sh $IP
-./workspace/proxmox/newvm jammy-cloudinit-4g step step.yml
+./workspace/proxmox/newvm --vmname step --userdata step.yml --ip $IP
 ```
 
 ## add DNS record

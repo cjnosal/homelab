@@ -9,7 +9,7 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 
 ```
 ./workspace/cloudinit/keycloak/generate.sh $IP
-./workspace/proxmox/newvm jammy-cloudinit-4g keycloak keycloak.yml
+./workspace/proxmox/newvm --vmname keycloak --userdata keycloak.yml --ip $IP
 ```
 
 ## update credentials
@@ -30,7 +30,7 @@ see cloudinit/bind/README.md (done first because cloudinit includes certbot setu
 ### Create realm
 
 Create a realm with ldap federation:
-`./create-realm $ADMIN_USER $ADMIN_PASSWORD $REALM`
+`./create-realm --username admin --password ${PLACEHOLDER_ADMIN_CRED} --authrealm master --realm infrastructure`
 
 or manually:
 * Click master (realm dropdown)
@@ -70,7 +70,8 @@ https://keycloak.home.arpa:8443/admin/infrastructure/console/#/
 
 ## generate clients from the CLI
 ```
-CLIENT_SECRET=$(/usr/local/bin/create-client $ADMIN_USER $ADMIN_PASSWORD $REALM -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
+CLIENT_SECRET=$(/usr/local/bin/create-client --username $ADMIN_USER --password $ADMIN_PASSWORD --authrealm $REALM --realm $REALM \
+  -- -s clientId=my_client -s 'redirectUris=["https://endpoint/path"]')
 ```
 
 ### expose LDAP groups to client

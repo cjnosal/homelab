@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+
+
+function selfhelp {
+  cat << EOF
+# argshelper: CLI flag helper
+
+# Intended usage:
+
+# define flags (that don't accept a value)
+FLAGS=(x y)
+# define options (that require a value)
+OPTIONS=(foo bar)
+
+# configure help description
+help_this="a cli tool"
+
+# document each field by prepending "help_"
+help_x="enable x"
+help_y="enable y"
+help_foo="set foo"
+help_bar="set bar"
+
+# set defaults
+bar=\${bar:-b1}
+
+# import functions
+source $0
+
+# set environment variables corresponding to each flag/option
+#  - unset flags default to "0", unset options default to ""
+#  - -h/--help are handled automatically
+parseargs \$@
+
+# check if required values are set
+requireargs foo
+
+# access values
+echo \${x:-} \${y:-} \${foo:-} \${bar:-}
+
+# debug
+showargs
+
+# try saving this output to a file and running it
+# $0 > test && chmod +rx test
+
+#./test --help
+#./test -x -y --foo f2 --bar b2
+#./test -- passthrough args
+#foo=f1 ./test
+EOF
+
+}
+
+if [[ "$(basename $0)" == "argshelper" ]]
+then
+  selfhelp
+
+  exit 1
+fi
+
+function parseargs {
+	HELP=false
+	UNRECOGNIZED=""
+	PASSTHROUGH=()
+
+	if [[ -z "${OPTIONS:-}" ]]
+	then
+	  declare -a OPTIONS
+	fi
+	if [[ -z "${FLAGS:-}" ]]
+	then
+	  declare -a FLAGS
+	fi
+
+	while [ $# -gt 0 ]
+	do
+	  match=false
+
+	  for opt in ${OPTIONS[@]}
+	  do
+	    if [[ "$1" == "--${opt}" || "$1" == "-${opt}" ]]
+	    then
+	      match=true
+	      export ${opt}=$2
+	      shift
+	      shift
+	      break
+	    fi
+	  done
+
+	  if [[ "$match" == "true" ]]
+	  then
+	    continue
+	  fi
+
+	  for flag in ${FLAGS[@]}
+	  do
+	    if [[ "$1" == "--${flag}" || "$1" == "-${flag}" ]]
+	    then
+	      match=true
+	      export ${flag}=1
+	      shift
+	      break
+	    fi
+	  done
+
+	  if [[ "$match" == "true" ]]
+	  then
+	    continue
+	  fi
+
+	  if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "-help" ]]
+	  then
+	    match=true
+	    HELP=true
+	    shift
+	    break
+	  fi
+
+	  if [[ "$1" == "--" ]]
+	  then
+	    match=true
+	    shift
+	    PASSTHROUGH=($@)
+	    break
+	  fi
+
+	  if [[ "$match" == "false" ]]
+	  then
+	    UNRECOGNIZED="$UNRECOGNIZED $1"
+	    shift
+	  fi
+	done
+
+	if [[ "$HELP" == "true" ]]
+	then
+	  showtoolhelp
+	  showargshelp
+	  exit 0
+	fi
+
+	if [[ -n "$UNRECOGNIZED" ]]
+	then
+	  echo "unrecognized argument(s): $UNRECOGNIZED"
+	  showargshelp
+	  exit 1
+	fi
+
+	defaultargs
+}
+
+function showtoolhelp {
+	this=$(basename $0)
+	if [[ -n "${help_this:-}" ]]
+	then
+	  echo "$this: ${help_this}"
+	else
+	  echo "$this: no description provided"
+	fi
+	echo
+}
+
+function showargshelp {
+
+	for flag in ${FLAGS[@]}
+	do
+		v=help_${flag}
+		if [[ -n "${!v:-}" ]]
+		then
+		  echo "  -$flag: ${!v:-}"
+		else
+		  echo "  -$flag: no description provided"
+		fi
+	done
+
+	for opt in ${OPTIONS[@]}
+	do
+		v=help_${opt}
+		if [[ -n "${!v:-}" ]]
+		then
+		  echo "  --$opt <value>: ${!v:-}"
+		else
+		  echo "  --$opt <value>: no description provided"
+		fi
+	done
+
+}
+
+function showargs {
+	for flag in ${FLAGS[@]}
+	do
+	  echo flag $flag = ${!flag:-}
+	done
+
+	for opt in ${OPTIONS[@]}
+	do
+	  echo opt $opt = ${!opt:-}
+	done
+
+	echo passthrough: ${PASSTHROUGH[@]}
+}
+
+function defaultargs {
+	for flag in ${FLAGS[@]}
+	do
+	  if [[ -z "${!flag:-}" ]]
+	  then
+	    export ${flag}=0
+	  fi
+	done
+
+	for opt in ${OPTIONS[@]}
+	do
+	  if [[ -z "${!opt:-}" ]]
+	  then
+	    export ${opt}=""
+	  fi
+	done
+}
+
+function requireargs {
+	missing=false
+	for arg in $@
+	do
+	  if [[ -z "${!arg:-}" ]]
+	  then
+	    echo missing required argument: $arg
+	    missing=true
+	  fi
+	done
+
+	if [[ "$missing" == "true" ]]
+	then
+	  showargshelp
+	  exit 1
+	fi
+}

@@ -43,9 +43,8 @@ do
 	sleep 2
 done
 
-create-realm admin ${PLACEHOLDER_ADMIN_CRED} infrastructure
+create-realm --username admin --password ${PLACEHOLDER_ADMIN_CRED} --authrealm master --realm infrastructure
 
-LDAP_ID=$(/opt/keycloak/bin/kcadm.sh get components -q name=ldap -r infrastructure | jq -r '.[0].id')
-/opt/keycloak/bin/kcadm.sh create user-storage/${LDAP_ID}/sync?action=triggerFullSync -r infrastructure
+sync-realm --username admin --password ${PLACEHOLDER_ADMIN_CRED} --authrealm master --realm infrastructure
 
 /opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gname=keycloak-realm-admin --cclientid realm-management --rolename realm-admin

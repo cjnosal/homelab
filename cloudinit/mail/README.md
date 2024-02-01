@@ -2,6 +2,12 @@
 
 ## setup
 
+```
+export IP=$(./workspace/proxmox/ips next)
+./workspace/cloudinit/mail/generate.sh $IP
+./workspace/proxmox/newvm --vmname mail --userdata mail.yml --ip $IP
+```
+
 ### set ldap passwords for default accounts
 `ldappasswd -x -D uid=$(whoami),ou=people,dc=home,dc=arpa -W -s $secret -S uid=${uid},ou=people,dc=home,dc=arpa`
 

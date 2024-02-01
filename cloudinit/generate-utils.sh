@@ -10,34 +10,37 @@ function write_snippet {
 
 	echo '#cloud-config' > /var/lib/vz/snippets/$FILENAME # ytt can't write comments
 
+	WORKSPACE=/root/workspace
+	
 	CA_ARGS=""
-	if [[ -f ${SCRIPT_DIR}/../../creds/step_root_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/step_root_ca.pem ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${SCRIPT_DIR}/../../creds/step_root_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${WORKSPACE}/creds/step_root_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../../creds/step_intermediate_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/step_intermediate_ca.pem ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${SCRIPT_DIR}/../../creds/step_intermediate_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${WORKSPACE}/creds/step_intermediate_ca.pem"
 	fi
 
 	VAULT_ARGS=""
-	if [[ -f ${SCRIPT_DIR}/../../creds/vault_host_ssh_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/vault_host_ssh_ca.pem ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_host_ssh_ca=${SCRIPT_DIR}/../../creds/vault_host_ssh_ca.pem"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_host_ssh_ca=${WORKSPACE}/creds/vault_host_ssh_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../../creds/vault_client_ssh_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/vault_client_ssh_ca.pem ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_client_ssh_ca=${SCRIPT_DIR}/../../creds/vault_client_ssh_ca.pem"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file vault_client_ssh_ca=${WORKSPACE}/creds/vault_client_ssh_ca.pem"
 	fi
-	if [[ -f ${SCRIPT_DIR}/../../creds/ssh_host_role_id ]]
+	if [[ -f ${WORKSPACE}/creds/ssh_host_role_id ]]
 	then
-		VAULT_ARGS="$VAULT_ARGS --data-value-file ssh_host_role_id=${SCRIPT_DIR}/../../creds/ssh_host_role_id"
+		VAULT_ARGS="$VAULT_ARGS --data-value-file ssh_host_role_id=${WORKSPACE}/creds/ssh_host_role_id"
 	fi
 
-	ytt -f ${SCRIPT_DIR}/../base-user-data.yml \
+	ytt -f ${WORKSPACE}/cloudinit/base-user-data.yml \
 	  --data-values-env YTT \
 	  --data-value-file ssh_authorized_keys=/root/.ssh/vm.pub \
 	  --data-value-file runcmd=${SCRIPT_DIR}/runcmd \
+	  --data-value-file argscmd=${WORKSPACE}/cloudinit/argshelper \
 	  $CA_ARGS $VAULT_ARGS $EXTRA_YTT_ARGS >> /var/lib/vz/snippets/$FILENAME
 
 	echo wrote /var/lib/vz/snippets/$FILENAME

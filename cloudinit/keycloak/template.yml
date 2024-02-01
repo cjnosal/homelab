@@ -79,15 +79,40 @@ write_files:
 
     cd /opt/keycloak/bin
 
-    ADMIN_USER=$1
-    ADMIN_PASSWORD=$2
-    REALM=$3
+    OPTIONS=(username password authrealm realm)
 
-    ./kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user $ADMIN_USER --password $ADMIN_PASSWORD
-    ./kcadm.sh create realms -s enabled=true -s realm=${REALM}
+    help_this="create a realm with ldap federation"
 
-    REALM_ID=$(./kcadm.sh get realms/${REALM} --fields id | jq -r .id)
-    LDAP_ID=$(./kcadm.sh create components -r ${REALM} \
+    help_username="keycloak admin"
+    help_password="keycloak admin's password"
+    help_authrealm="realm the keycloak admin belongs to"
+    help_realm="realm to create"
+
+    authrealm=${authrealm:-master}
+    realm=${realm:-infrastructure}
+
+    source /usr/local/include/argshelper
+
+    parseargs $@
+    requireargs authrealm realm
+
+    if [[ -z "$username" ]]
+    then
+      echo keycloak username:
+      read username
+    fi
+
+    if [[ -z "$password" ]]
+    then
+      echo password:
+      read -s password
+    fi
+
+    ./kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm $authrealm --user $username --password $password
+    ./kcadm.sh create realms -s enabled=true -s realm=${realm}
+
+    REALM_ID=$(./kcadm.sh get realms/${realm} --fields id | jq -r .id)
+    LDAP_ID=$(./kcadm.sh create components -r ${realm} \
         -s name="ldap" \
         -s parentId=$REALM_ID \
         -s providerId=ldap \
@@ -102,7 +127,7 @@ write_files:
         -s 'config.authType=["none"]' \
         -i)
 
-    ./kcadm.sh create components -r ${REALM} \
+    ./kcadm.sh create components -r ${realm} \
         -s name="group-ldap-mapper" \
         -s parentId=$LDAP_ID \
         -s providerId=group-ldap-mapper \
@@ -125,17 +150,40 @@ write_files:
     # mapper "ldap-groups" automatically added to include LDAP groups in the "groups" token claim
     # prints client secret
 
-    ADMIN_USER=$1
-    shift
-    ADMIN_PASSWORD=$1
-    shift
-    REALM=$1
-    shift
+    OPTIONS=(username password authrealm realm)
 
-    /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm master --user $ADMIN_USER --password $ADMIN_PASSWORD
-    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${REALM} -i $@ )
+    help_this="create a new oidc client with access to ldap groups, returning the client secret.
+      args following '--' are passed to \`kcadm.sh create\`"
 
-    /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${REALM} \
+    help_username="keycloak admin"
+    help_password="keycloak admin's password"
+    help_authrealm="realm the keycloak admin belongs to"
+    help_realm="client realm"
+
+    authrealm=${authrealm:-infrastructure}
+    realm=${realm:-infrastructure}
+
+    source /usr/local/include/argshelper
+
+    parseargs $@
+    requireargs authrealm realm
+
+    if [[ -z "$username" ]]
+    then
+      echo keycloak username:
+      read username
+    fi
+
+    if [[ -z "$password" ]]
+    then
+      echo password:
+      read -s password
+    fi
+
+    /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm $authrealm --user $username --password $password
+    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} -i ${PASSTHROUGH[@]} )
+
+    /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
      -s name=ldap-groups \
      -s protocol=openid-connect \
      -s protocolMapper=oidc-group-membership-mapper \
@@ -146,7 +194,48 @@ write_files:
      -s 'config."userinfo.token.claim"=true' \
      -s 'config."access.token.claim"=true'
 
-    /opt/keycloak/bin/kcadm.sh get clients/$CID -r ${REALM} --fields=secret | jq -r '.secret'
+    /opt/keycloak/bin/kcadm.sh get clients/$CID -r ${realm} --fields=secret | jq -r '.secret'
+- path: /usr/local/bin/sync-realm
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    OPTIONS=(username password authrealm realm)
+
+    help_this="sync LDAP attributes to keycloak"
+
+    help_username="keycloak admin"
+    help_password="keycloak admin's password"
+    help_authrealm="realm the keycloak admin belongs to"
+    help_realm="realm to sync"
+
+    authrealm=${authrealm:-infrastructure}
+    realm=${realm:-infrastructure}
+
+    source /usr/local/include/argshelper
+
+    parseargs $@
+    requireargs authrealm realm
+
+    if [[ -z "$username" ]]
+    then
+      echo keycloak username:
+      read username
+    fi
+
+    if [[ -z "$password" ]]
+    then
+      echo password:
+      read -s password
+    fi
+
+    /opt/keycloak/bin/kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm $authrealm --user $username --password $password
+
+    LDAP_ID=$(/opt/keycloak/bin/kcadm.sh get components -q name=ldap -r $realm | jq -r '.[0].id')
+    /opt/keycloak/bin/kcadm.sh create user-storage/${LDAP_ID}/sync?action=triggerFullSync -r $realm
 - path: /root/runcmd
   owner: root:root
   permissions: '0750'

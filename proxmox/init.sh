@@ -25,24 +25,20 @@ ssh-add ~/.ssh/vm
 ./workspace/proxmox/updatetemplate || ./workspace/proxmox/createtemplate
 
 # prepare service vms
-export NAMESERVER=192.168.3.1
-export SKIP_DOMAIN=true
-./workspace/proxmox/preparevm bind
-unset NAMESERVER
-unset SKIP_DOMAIN
+./workspace/proxmox/preparevm --vmname bind --skip_domain -- --nameserver 192.168.3.1
 
 ssh ubuntu@bind.home.arpa addhost.sh pve 192.168.2.200
 
-./workspace/proxmox/preparevm step
+./workspace/proxmox/preparevm --vmname step
 
 ssh ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.pem
 ssh ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.pem
 
-./workspace/proxmox/preparevm ldap
+./workspace/proxmox/preparevm --vmname ldap
 
-./workspace/proxmox/preparevm keycloak
+./workspace/proxmox/preparevm --vmname keycloak
 
-./workspace/proxmox/preparevm vault
+./workspace/proxmox/preparevm --vmname vault
 
 curl -kfSsL -o /root/workspace/creds/vault_host_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-host-signer/public_key
 curl -kfSsL -o /root/workspace/creds/vault_client_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
@@ -92,7 +88,7 @@ set -euo pipefail
 cd /opt/keycloak/bin
 #./kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm master --user admin --password ${KEYCLOAK_ADMIN_PASSWD}
 
-/usr/local/bin/create-client admin ${KEYCLOAK_ADMIN_PASSWD} infrastructure -s clientId=vault \
+/usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=vault \
 	-s 'redirectUris=["http://localhost:8250/oidc/callback","https://vault.home.arpa:8250/oidc/callback","https://vault.home.arpa:8200/ui/vault/auth/oidc/oidc/callback"]'
 EOF
 )
@@ -126,7 +122,7 @@ EOF
 # step oidc login
 STEP_CLIENT_SECRET=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF
 set  -euo pipefail
-/usr/local/bin/create-client admin ${KEYCLOAK_ADMIN_PASSWD} infrastructure -s clientId=step-ca \
+/usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=step-ca \
 	-s 'redirectUris=["http://127.0.0.1:10000/*"]' || \
   /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=step-ca --fields secret | jq -r '.[0].secret'
 EOF
@@ -251,19 +247,9 @@ then
 fi
 echo "$NEW_KEYCLOAK_PASSWORD" > ./workspace/creds/keycloak_admin.passwd
 
-# create workstation
-export IP=$(./workspace/proxmox/ips next)
-ssh ubuntu@bind.home.arpa addhost.sh workstation $IP
-./workspace/cloudinit/workstation/generate.sh
-bash -c "
-export DISK0=32G
-export MEMORY=8192
-export CORES=4
-./workspace/proxmox/newvm jammy-cloudinit-4g workstation workstation.yml
+./workspace/proxmox/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
 
-./workspace/proxmox/waitforhost workstation.home.arpa"
-
-./workspace/proxmox/preparevm mail
+./workspace/proxmox/preparevm --vmname mail
 DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
 sudo cat /etc/opendkim/mail.txt
 EOF
