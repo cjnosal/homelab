@@ -147,6 +147,12 @@ write_files:
         -s 'config."membership.ldap.attribute"=[ "member" ]' \
         -s 'config."group.object.classes"=[ "groupOfNames" ]' \
         -i
+
+    ./kcadm.sh create client-scopes -r ${realm} \
+        -s name="groups" \
+        -s protocol="openid-connect" \
+        -s 'attributes."include.in.token.scope"=true' \
+        -s 'attributes."display.on.consent.screen"=true'
 - path: /usr/local/bin/create-client
   owner: root:root
   permissions: '0755'
@@ -190,7 +196,10 @@ write_files:
     fi
 
     /opt/keycloak/bin/kcadm.sh config credentials --server https://(@= data.values.hostname @).(@= data.values.zone @):8443 --realm $authrealm --user $username --password $password
-    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} -i ${PASSTHROUGH[@]} )
+    CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} \
+      -s 'defaultClientScopes=["email", "preferred_username", "groups"]' \
+      -s 'optionalClientScopes=["address", "phone", "offline_access", "microprofile-jwt"]' \
+      -i ${PASSTHROUGH[@]} )
 
     /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
      -s name=ldap-groups \
@@ -199,6 +208,17 @@ write_files:
      -s 'config."claim.name"=groups' \
      -s 'config."full.path"=false' \
      -s 'config."multivalued"=true' \
+     -s 'config."id.token.claim"=true' \
+     -s 'config."userinfo.token.claim"=true' \
+     -s 'config."access.token.claim"=true'
+
+    /opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
+     -s name=username \
+     -s protocol=openid-connect \
+     -s protocolMapper=oidc-usermodel-attribute-mapper \
+     -s 'config."claim.name"=preferred_username' \
+     -s 'config."user.attribute"=username' \
+     -s 'config."jsonType.label"=String' \
      -s 'config."id.token.claim"=true' \
      -s 'config."userinfo.token.claim"=true' \
      -s 'config."access.token.claim"=true'
