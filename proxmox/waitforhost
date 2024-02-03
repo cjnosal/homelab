@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-while ! ssh-keyscan -H $1 >> ~/.ssh/known_hosts
+target=$1
+
+while [[ -z "$(dig -4 $target @bind.home.arpa +noall +answer)" ]]
 do
-  echo waiting for ssh $1
+  echo waiting for dns resolution of $target
+  sleep 2
+done
+
+while ! ssh-keyscan -H $target >> ~/.ssh/known_hosts
+do
+  echo waiting for ssh-keyscan of $target
+  sleep 2
+done
+
+while ! ssh ubuntu@${target} echo connected to $target
+do
+  echo waiting for sshd on $target
   sleep 2
 done
