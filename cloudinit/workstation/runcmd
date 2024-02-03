@@ -21,6 +21,11 @@ ldap-auth-config ldap-auth-config/dblogin boolean false
 EOF
 
 wget --progress=dot:giga https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
+chmod a+rx /usr/local/bin/ytt
+
+wget --progress=dot:giga https://github.com/carvel-dev/kapp/releases/download/v0.60.0/kapp-linux-amd64 -O /usr/local/bin/kapp
+chmod a+rx /usr/local/bin/kapp
+
 wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.24.4/step-cli_0.24.4_amd64.deb
 dpkg -i step-cli_0.24.4_amd64.deb
 wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -45,5 +50,12 @@ mkdir -p /etc/firefox/ca-certificates
 chmod a+rx /etc/firefox/ca-certificates
 cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
 chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
+
+wget --progress=dot:giga https://get.pinniped.dev/v0.28.0/pinniped-cli-linux-amd64
+mv pinniped-cli-linux-amd64 /usr/local/bin/pinniped
+chmod a+rx /usr/local/bin/pinniped
+
+snap install helm --classic
+snap install kubectl --classic
 
 shutdown -r +1

@@ -64,6 +64,8 @@ addldapgroup vault-user
 addldapgroup vault-admin
 addldapgroup ssh-ops
 addldapgroup ldap-admin
+addldapgroup k8s-core-admin
+addldapgroup k8s-run-admin
 
 # initial admin
 addldapuser $USERNAME $USER_GIVEN_NAME $USER_SURNAME $USER_EMAIL
@@ -83,5 +85,7 @@ addldapusertogroup $USERNAME vault-user
 addldapusertogroup $USERNAME vault-admin
 addldapusertogroup $USERNAME ssh-ops
 addldapusertogroup $USERNAME ldap-admin
+addldapusertogroup $USERNAME k8s-core-admin
+addldapusertogroup $USERNAME k8s-run-admin
 
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $PLACEHOLDER_USER_CRED -S uid=${USERNAME},ou=people,${SUFFIX}

@@ -1,0 +1,41 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:overlay", "overlay")
+#@overlay/match by=overlay.all,expects="0+"
+#@overlay/match-child-defaults missing_ok=True
+---
+write_files:
+- path: /root/runcmd
+  owner: root:root
+  permissions: '0750'
+  #@yaml/text-templated-strings
+  content: #@ data.values.runcmd
+#@ if hasattr(data.values, "deploycmd"):
+- path: /usr/local/bin/deploy.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: #@ data.values.deploycmd
+#@ end
+#@ if hasattr(data.values, "joincmd"):
+- path: /root/joincmd
+  owner: root:root
+  permissions: '0700'
+  #@yaml/text-templated-strings
+  content: #@ data.values.joincmd
+#@ end
+- path: /root/kubeadmconfig.yml
+  owner: root:root
+  permissions: '0600'
+  #@yaml/text-templated-strings
+  content: |
+    apiVersion: kubeadm.k8s.io/v1beta3
+    kind: ClusterConfiguration
+    controlPlaneEndpoint: #@ "{}.home.arpa".format(data.values.hostname)
+    networking:
+      podSubnet: "10.244.0.0/16"
+    ---
+    apiVersion: kubelet.config.k8s.io/v1beta1
+    kind: KubeletConfiguration
+    serverTLSBootstrap: true
+runcmd:
+- #@ "/root/runcmd {}".format(data.values.node)

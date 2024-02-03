@@ -167,6 +167,29 @@ EOD
 
 EOF
 
+# k8s oidc login
+ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash > ./workspace/creds/k8s-pinniped-client-secret << EOF
+set  -euo pipefail
+/usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=pinniped \
+  -s 'redirectUris=["https://pinniped.home.arpa/homelab-issuer/callback"]' || \
+  /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=pinniped --fields secret | jq -r '.[0].secret'
+EOF
+
+# tsig setup for pinniped.home.arpa
+ssh ubuntu@bind.home.arpa sudo bash <<EOF
+set -euo pipefail
+tsig-keygen -a hmac-sha512 k8s-core-cert-manager >> /etc/bind/named.conf.tsigkeys
+add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.home.arpa txt;"
+EOF
+
+ssh ubuntu@bind.home.arpa sudo cat /etc/bind/named.conf.tsigkeys > ./workspace/creds/tsigkeys
+
+./workspace/cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addresses "192.168.2.100-192.168.2.109" --workers 2 --subdomain eng \
+  --tsig_name k8s-core-cert-manager --client_id pinniped --supervisor
+
+./workspace/cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "192.168.2.110-192.168.2.119" --workers 2 --subdomain apps
+
+
 ## sync dns journal to config
 ssh ubuntu@bind.home.arpa bash << EOF
 set -euo pipefail

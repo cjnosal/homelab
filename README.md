@@ -27,4 +27,5 @@ then run bootstrap.sh
 * SSH CA (Vault)
 * Secret management (Vault)
 * Mail (postfix + dovecot + spamassassin + clamav + sieve)
+* Kubernetes (flannel + metrics-server + cert-manager + ingress-nginx + metallb + openebs + pinniped)
 * Workstation (Lubuntu + xrdp + firefox + thunderbird)
