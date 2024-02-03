@@ -1,2 +1,3 @@
 cloudinit/user.yml
 creds/
+init.log
