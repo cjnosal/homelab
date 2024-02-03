@@ -98,7 +98,7 @@ systemctl is-active clamav-daemon --wait
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
   clamav-freshclam clamav-milter arj bzip2 cabextract cpio file gzip lhasa lzop nomarch p7zip pax rar rpm unrar unzip zip
 
-service clamav-milter restart
+systemctl is-active clamav-milter --wait
 
 
 # sieve setup
