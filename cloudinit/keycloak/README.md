@@ -94,5 +94,6 @@ curl -kfsSL -X POST 'https://keycloak.home.arpa:8443/realms/infrastructure/proto
 
 ## assign realm admin role to ldap group
 ```
-/opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gname=keycloak-realm-admin --cclientid realm-management --rolename realm-admin
+GROUP_ID=$(/opt/keycloak/bin/kcadm.sh get groups -r infrastructure -q search=keycloak-realm-admin | jq -r .[0].id)
+/opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gid $GROUP_ID --cclientid realm-management --rolename realm-admin
 ```
