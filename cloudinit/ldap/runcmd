@@ -57,6 +57,10 @@ export LDAP_BIND_PW="$PLACEHOLDER_ADMIN_CRED"
 
 ldapadd -H ldapi:/// -f /run/org.ldif -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW"
 
+ldapadd -H ldapi:/// -f /run/load_memberof.ldif -Q -Y EXTERNAL
+ldapmodify -H ldapi:/// -f /run/load_refint.ldif -Q -Y EXTERNAL
+ldapadd -H ldapi:/// -f /run/configure_refint.ldif -Q -Y EXTERNAL
+
 addldapgroup keycloak-realm-admin
 addldapgroup step-admin
 addldapgroup step-provisioner-admin
