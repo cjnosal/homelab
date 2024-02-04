@@ -39,6 +39,7 @@ write_files:
             type master;
             file "/var/lib/bind/forward.(@= data.values.zone @)";
             include "/etc/bind/named.conf.update-policy";
+            include "/etc/bind/named.conf.allow-transfer";
     };
     zone "(@= data.values.reverse_zone @)" IN {
             type master;
@@ -54,6 +55,14 @@ write_files:
   content: |
     update-policy {
       grant local-ddns zonesub any;
+    };
+- path: /etc/bind/named.conf.allow-transfer
+  owner: root:root
+  permissions: '0644'
+  #@yaml/text-templated-strings
+  content: |
+    allow-transfer {
+      key local-ddns;
     };
 - path: #@ "/var/lib/bind/forward.{}".format(data.values.zone)
   owner: root:root
@@ -220,6 +229,16 @@ write_files:
     set -euo pipefail
 
     sed -i.bk$(date +%s) "s/};/  $@\n};/" /etc/bind/named.conf.update-policy
+    sudo rndc reload
+- path: /usr/local/bin/add-allow-transfer.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    sed -i.bk$(date +%s) "s/};/  $@\n};/" /etc/bind/named.conf.allow-transfer
     sudo rndc reload
 - path: /root/runcmd
   owner: root:root

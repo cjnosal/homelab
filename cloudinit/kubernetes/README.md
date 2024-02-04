@@ -9,7 +9,7 @@ All clusters are setup with nginx ingress, metalLB, cert-manager, and EBS storag
 ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash > ./workspace/creds/k8s-pinniped-client-secret << EOF
 set  -euo pipefail
 /usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=pinniped \
-  -s 'redirectUris=["https://pinniped.home.arpa/homelab-issuer/callback"]' || \
+  -s 'redirectUris=["https://pinniped.eng.home.arpa/homelab-issuer/callback"]' || \
   /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=pinniped --fields secret | jq -r '.[0].secret'
 EOF
 ```
@@ -19,7 +19,7 @@ EOF
 ssh ubuntu@bind.home.arpa sudo bash <<EOF
 set -euo pipefail
 tsig-keygen -a hmac-sha512 k8s-core-cert-manager >> /etc/bind/named.conf.tsigkeys
-add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.home.arpa txt;"
+add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.eng.home.arpa txt;"
 EOF
 
 ssh ubuntu@bind.home.arpa sudo cat /etc/bind/named.conf.tsigkeys > ./workspace/creds/tsigkeys

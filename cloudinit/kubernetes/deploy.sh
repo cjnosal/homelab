@@ -2,12 +2,13 @@
 set -euo pipefail
 
 FLAGS=(supervisor)
-OPTIONS=(cluster tsig_name client_id lb_addresses workers subdomain)
+OPTIONS=(cluster cert_manager_tsig_name external_dns_tsig_name client_id lb_addresses workers subdomain)
 
 help_this="prepare cluster networking utilities"
 
 help_cluster="cluster name"
-help_tsig_name="name of bind tsig key allowing dynamic updates of required _acme-challenge subdomains"
+help_cert_manager_tsig_name="name of bind tsig key allowing dynamic updates of required _acme-challenge subdomains"
+help_external_dns_tsig_name="name of bind tsig key allowing dynamic updates of A records for load balancer addresses"
 help_client_id="oidc id for pinniped's upstream identity provider"
 help_lb_addresses="ip list or range for metallb to allocate"
 help_supervisor="install pinniped supervisor in this cluster"
@@ -120,9 +121,9 @@ spec:
           ingressClassName: nginx
 EOF
 
-if [[ -n "$tsig_name" ]]
+if [[ -n "$cert_manager_tsig_name" ]]
 then
-kubectl create secret generic tsig -n cert-manager --from-file=key=/home/ubuntu/.tsig \
+kubectl create secret generic tsig -n cert-manager --from-file=key=/home/ubuntu/cert-manager.tsig \
   || kubectl get secret tsig -n cert-manager
 kubectl apply -f- <<EOF
 ---
@@ -140,7 +141,7 @@ spec:
     - dns01:
         rfc2136:
           nameserver: bind.home.arpa
-          tsigKeyName: $tsig_name
+          tsigKeyName: $cert_manager_tsig_name
           tsigAlgorithm: HMACSHA512
           tsigSecretSecretRef:
             name: tsig
@@ -197,6 +198,8 @@ kind: Service
 metadata:
   name: pinniped-supervisor-loadbalancer
   namespace: pinniped-supervisor
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: pinniped.eng.home.arpa
 spec:
   type: LoadBalancer
   selector:
@@ -217,7 +220,7 @@ spec:
     name: bind-issuer
     kind: ClusterIssuer
   dnsNames:
-  - "pinniped.home.arpa"
+  - "pinniped.eng.home.arpa"
 ---
 apiVersion: idp.supervisor.pinniped.dev/v1alpha1
 kind: OIDCIdentityProvider
@@ -253,7 +256,7 @@ metadata:
   name: homelab-federation-domain
   namespace: pinniped-supervisor
 spec:
-  issuer: "https://pinniped.home.arpa/homelab-issuer"
+  issuer: "https://pinniped.eng.home.arpa/homelab-issuer"
   tls:
     secretName: supervisor-tls-cert
   identityProviders:
@@ -293,11 +296,111 @@ metadata:
   name: pinniped-authenticator
   namespace: pinniped-concierge
 spec:
-  issuer: "https://pinniped.home.arpa/homelab-issuer"
+  issuer: "https://pinniped.eng.home.arpa/homelab-issuer"
   audience: $cluster
   tls:
     certificateAuthorityData: "$STEP_CA_B64"
 EOF
+
+# external-dns
+if [[ -n "$external_dns_tsig_name" ]]
+then
+  kapp deploy -y -a external-dns -f- <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns
+  labels:
+    name: external-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+  namespace: external-dns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  - nodes
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - extensions
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: external-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-viewer
+  namespace: external-dns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: external-dns
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: registry.k8s.io/external-dns/external-dns:v0.14.0
+        args:
+        - --registry=txt
+        - --txt-prefix=k8s-${cluster}-external-dns-
+        - --txt-owner-id=k8s-${cluster}
+        - --provider=rfc2136
+        - --rfc2136-host=bind.home.arpa
+        - --rfc2136-port=53
+        - --rfc2136-zone=home.arpa
+        - --rfc2136-tsig-secret=$(cat /home/ubuntu/external-dns.tsig)
+        - --rfc2136-tsig-secret-alg=hmac-sha512
+        - --rfc2136-tsig-keyname=${external_dns_tsig_name}
+        - --rfc2136-tsig-axfr
+        - --rfc2136-min-ttl=300s
+        - --source=ingress
+        - --source=service
+        - --domain-filter=.${subdomain}.home.arpa
+        - --policy=sync
+        - --log-level=info
+        - --txt-cache-interval=5m
+        - --interval=15m
+        - --events
+EOF
+fi
 
 # Allow admins full access
 cat <<EOF | kubectl apply -f -

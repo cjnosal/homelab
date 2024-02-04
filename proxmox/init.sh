@@ -171,23 +171,34 @@ EOF
 ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash > ./workspace/creds/k8s-pinniped-client-secret << EOF
 set  -euo pipefail
 /usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=pinniped \
-  -s 'redirectUris=["https://pinniped.home.arpa/homelab-issuer/callback"]' || \
+  -s 'redirectUris=["https://pinniped.eng.home.arpa/homelab-issuer/callback"]' || \
   /opt/keycloak/bin/kcadm.sh get clients -r infrastructure -q clientId=pinniped --fields secret | jq -r '.[0].secret'
 EOF
 
-# tsig setup for pinniped.home.arpa
+# tsig setup for pinniped acme challenge and external-dns
 ssh ubuntu@bind.home.arpa sudo bash <<EOF
 set -euo pipefail
 tsig-keygen -a hmac-sha512 k8s-core-cert-manager >> /etc/bind/named.conf.tsigkeys
-add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.home.arpa txt;"
+tsig-keygen -a hmac-sha512 k8s-core-external-dns >> /etc/bind/named.conf.tsigkeys
+tsig-keygen -a hmac-sha512 k8s-run-cert-manager >> /etc/bind/named.conf.tsigkeys
+tsig-keygen -a hmac-sha512 k8s-run-external-dns >> /etc/bind/named.conf.tsigkeys
+add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.eng.home.arpa txt;"
+add-update-policy.sh "grant k8s-core-external-dns wildcard *.eng.home.arpa a;"
+add-update-policy.sh "grant k8s-core-external-dns wildcard *.eng.home.arpa txt;"
+add-update-policy.sh "grant k8s-run-external-dns wildcard *.apps.home.arpa a;"
+add-update-policy.sh "grant k8s-run-external-dns wildcard *.apps.home.arpa txt;"
+add-allow-transfer.sh "key k8s-core-external-dns;"
+add-allow-transfer.sh "key k8s-run-external-dns;"
 EOF
 
 ssh ubuntu@bind.home.arpa sudo cat /etc/bind/named.conf.tsigkeys > ./workspace/creds/tsigkeys
 
 ./workspace/cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addresses "192.168.2.100-192.168.2.109" --workers 2 --subdomain eng \
-  --tsig_name k8s-core-cert-manager --client_id pinniped --supervisor
+  --cert_manager_tsig_name k8s-core-cert-manager --external_dns_tsig_name k8s-core-external-dns \
+  --client_id pinniped --supervisor
 
-./workspace/cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "192.168.2.110-192.168.2.119" --workers 2 --subdomain apps
+./workspace/cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "192.168.2.110-192.168.2.119" --workers 2 --subdomain apps \
+  --cert_manager_tsig_name k8s-run-cert-manager --external_dns_tsig_name k8s-run-external-dns
 
 
 ## sync dns journal to config

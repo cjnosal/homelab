@@ -2,12 +2,13 @@
 set -euo pipefail
 
 FLAGS=(supervisor)
-OPTIONS=(cluster tsig_name client_id lb_addresses workers subdomain)
+OPTIONS=(cluster cert_manager_tsig_name external_dns_tsig_name client_id lb_addresses workers subdomain)
 
 help_this="create a kubernetes cluster"
 
 help_cluster="cluster name"
-help_tsig_name="name of bind tsig key allowing dynamic updates of required _acme-challenge subdomains"
+help_cert_manager_tsig_name="name of bind tsig key allowing dynamic updates of required _acme-challenge subdomains"
+help_external_dns_tsig_name="name of bind tsig key allowing dynamic updates of A records for load balancer addresses"
 help_client_id="oidc id for pinniped's upstream identity provider"
 help_lb_addresses="ip list or range for metallb to allocate"
 help_workers="number of worker nodes"
@@ -48,11 +49,18 @@ done
 
 deploy_args=""
 
-if [[ -n "$tsig_name" ]]
+if [[ -n "$cert_manager_tsig_name" ]]
 then
-  cat ./workspace/creds/tsigkeys | grep "key \"${tsig_name}\"" -A2 | grep secret | cut -d'"' -f2 > ./workspace/creds/tsigkeys-${tsig_name}
-  scp ./workspace/creds/tsigkeys-${tsig_name} ubuntu@${mastervm}.home.arpa:/home/ubuntu/.tsig
-  deploy_args="$deploy_args --tsig_name $tsig_name"
+  cat ./workspace/creds/tsigkeys | grep "key \"${cert_manager_tsig_name}\"" -A2 | grep secret | cut -d'"' -f2 > ./workspace/creds/tsigkeys-${cert_manager_tsig_name}
+  scp ./workspace/creds/tsigkeys-${cert_manager_tsig_name} ubuntu@${mastervm}.home.arpa:/home/ubuntu/cert-manager.tsig
+  deploy_args="$deploy_args --cert_manager_tsig_name $cert_manager_tsig_name"
+fi
+
+if [[ -n "$external_dns_tsig_name" ]]
+then
+  cat ./workspace/creds/tsigkeys | grep "key \"${external_dns_tsig_name}\"" -A2 | grep secret | cut -d'"' -f2 > ./workspace/creds/tsigkeys-${external_dns_tsig_name}
+  scp ./workspace/creds/tsigkeys-${external_dns_tsig_name} ubuntu@${mastervm}.home.arpa:/home/ubuntu/external-dns.tsig
+  deploy_args="$deploy_args --external_dns_tsig_name $external_dns_tsig_name"
 fi
 
 if [[ -n "$client_id" ]]
@@ -71,30 +79,9 @@ set -euo pipefail
 deploy.sh --cluster $cluster --subdomain $subdomain --lb_addresses $lb_addresses --workers $workers $deploy_args
 EOF
 
-INGRESS_IP=$(ssh -o LogLevel=error ubuntu@${mastervm}.home.arpa sudo bash << EOF
-  set -euo pipefail
-  export KUBECONFIG=/etc/kubernetes/admin.conf
-  kubectl get services -n ingress-nginx ingress-nginx-controller \
-    --output jsonpath='{.status.loadBalancer.ingress[0].ip}'
-EOF
-)
-ssh ubuntu@bind.home.arpa addhost.sh \*.${subdomain} $INGRESS_IP
-
-if [[ "$supervisor" == "1" ]]
-then
-  PINNIPED_IP=$(ssh -o LogLevel=error ubuntu@${mastervm}.home.arpa sudo bash << EOF
-    set -euo pipefail
-    export KUBECONFIG=/etc/kubernetes/admin.conf
-    kubectl get services -n pinniped-supervisor pinniped-supervisor-loadbalancer \
-      --output jsonpath='{.status.loadBalancer.ingress[0].ip}'
-EOF
-  )
-  ssh ubuntu@bind.home.arpa addhost.sh pinniped $PINNIPED_IP
-fi
-
 ssh ubuntu@${mastervm}.home.arpa sudo bash << EOF
 set -euo pipefail
-while ! curl -fSsL https://pinniped.home.arpa/homelab-issuer/.well-known/openid-configuration
+while ! curl -fSsL https://pinniped.eng.home.arpa/homelab-issuer/.well-known/openid-configuration
 do
   echo waiting for pinniped supervisor
   sleep 2

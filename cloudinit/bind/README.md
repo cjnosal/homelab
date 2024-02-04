@@ -36,7 +36,7 @@ Generate a tsig key
 `tsig-keygen -a hmac-sha512 k8s-core-cert-manager >> /etc/bind/named.conf.tsigkeys`
 
 Grant the tsig key access
-`add-update-policy.sh "grant cert-manager name _acme-challenge.pinniped.home.arpa txt;"`
+`add-update-policy.sh "grant cert-manager name _acme-challenge.pinniped.eng.home.arpa txt;"`
 
 ## Add all Proxmox VMs and Containers
 On PVE Node:
