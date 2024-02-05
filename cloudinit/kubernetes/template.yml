@@ -30,9 +30,12 @@ write_files:
   content: |
     apiVersion: kubeadm.k8s.io/v1beta3
     kind: ClusterConfiguration
-    controlPlaneEndpoint: #@ "{}.home.arpa".format(data.values.hostname)
+    controlPlaneEndpoint: (@= data.values.hostname @).home.arpa
     networking:
       podSubnet: "10.244.0.0/16"
+    apiServer:
+      certSANs:
+      - (@= data.values.hostname @).home.arpa
     ---
     apiVersion: kubelet.config.k8s.io/v1beta1
     kind: KubeletConfiguration
