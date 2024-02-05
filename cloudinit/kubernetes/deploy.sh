@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FLAGS=(supervisor)
-OPTIONS=(cluster tsig_name client_id lb_addresses workers)
+OPTIONS=(cluster tsig_name client_id lb_addresses workers subdomain)
 
 help_this="prepare cluster networking utilities"
 
@@ -12,6 +12,7 @@ help_client_id="oidc id for pinniped's upstream identity provider"
 help_lb_addresses="ip list or range for metallb to allocate"
 help_supervisor="install pinniped supervisor in this cluster"
 help_workers="number of worker nodes"
+help_subdomain="DNS subdomain for nginx ingress"
 
 source /usr/local/include/argshelper
 

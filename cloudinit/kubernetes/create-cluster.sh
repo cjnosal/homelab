@@ -68,7 +68,7 @@ fi
 
 ssh ubuntu@${mastervm}.home.arpa sudo bash << EOF
 set -euo pipefail
-deploy.sh --cluster $cluster --lb_addresses $lb_addresses --workers $workers $deploy_args
+deploy.sh --cluster $cluster --subdomain $subdomain --lb_addresses $lb_addresses --workers $workers $deploy_args
 EOF
 
 INGRESS_IP=$(ssh -o LogLevel=error ubuntu@${mastervm}.home.arpa sudo bash << EOF
