@@ -16,4 +16,5 @@ export YTT_cert_group=vault
 export YTT_fullchain_path=/opt/vault/tls/tls.crt
 export YTT_privkey_path=/opt/vault/tls/tls.key
 
-write_snippet vault.yml  -f ${SCRIPT_DIR}/template.yml
+write_snippet vault.yml  -f ${SCRIPT_DIR}/template.yml \
+  --data-value-file add_app_role_script=${SCRIPT_DIR}/scripts/add-app-role.sh

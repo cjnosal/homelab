@@ -60,24 +60,6 @@ path "ssh-client-signer/sign/ssh-role" {
 }
 EOF
 
-vault policy write ssh-host -<<EOF
-path "ssh-host-signer/roles/*" {
- capabilities = ["list"]
-}
-path "ssh-host-signer/sign/hostrole" {
- capabilities = ["create","update"]
-}
-EOF
-
-vault policy write approle-secret-id -<<EOF
-path "auth/approle/role/+/secret-id" {
-  capabilities = ["create", "update"]
-}
-path "auth/approle/role/+/role-id" {
-  capabilities = ["read"]
-}
-EOF
-
 vault auth enable oidc
 vault auth enable ldap
 vault auth enable approle
@@ -109,17 +91,6 @@ vault write ssh-client-signer/roles/ssh-role -<<EOF
   "ttl": "30m0s"
 }
 EOF
-
-vault write auth/approle/role/ssh-host-role \
-  secret_id_ttl=10m \
-  token_num_uses=10 \
-  token_ttl=20m \
-  token_max_ttl=30m \
-  secret_id_num_uses=1 \
-  secret_id_bound_cidrs=192.168.2.0/23 \
-  token_bound_cidrs=192.168.2.0/23 \
-  bind_secret_id=false \
-  token_policies=ssh-host
 
 vault write auth/oidc/role/vault-admin -<<EOF
 {
@@ -167,8 +138,7 @@ vault write auth/oidc/role/ssh-ops -<<EOF
   ],
   "user_claim": "preferred_username",
   "token_policies": [
-    "ssh-ops",
-    "approle-secret-id"
+    "ssh-ops"
   ],
   "bound_claims": {
     "groups": [
@@ -189,4 +159,13 @@ vault write auth/ldap/config \
   groupfilter="(member={{.UserDN}})"
 vault write auth/ldap/groups/vault-admin policies=vault-admin policies=kv-user policies=infrastructure-user
 vault write auth/ldap/groups/vault-user policies=kv-user
-vault write auth/ldap/groups/ssh-ops policies=ssh-ops policies=approle-secret-id
+vault write auth/ldap/groups/ssh-ops policies=ssh-ops
+
+add-app-role.sh --app ssh-host --owner ssh-ops --policy - << EOF
+path "ssh-host-signer/roles/*" {
+ capabilities = ["list"]
+}
+path "ssh-host-signer/sign/hostrole" {
+ capabilities = ["create","update"]
+}
+EOF
