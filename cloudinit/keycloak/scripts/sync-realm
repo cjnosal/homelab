@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(username password authrealm realm)
+
+help_this="sync LDAP attributes to keycloak"
+
+help_username="keycloak admin"
+help_password="keycloak admin's password"
+help_authrealm="realm the keycloak admin belongs to"
+help_realm="realm to sync"
+
+authrealm=${authrealm:-infrastructure}
+realm=${realm:-infrastructure}
+
+source /usr/local/include/argshelper
+
+if [[ -d /opt/keycloak/bin ]]
+then
+  PATH=$PATH:/opt/keycloak/bin/
+fi
+
+parseargs $@
+requireargs authrealm realm
+
+if [[ -z "$username" ]]
+then
+  echo keycloak username:
+  read username
+fi
+
+if [[ -z "$password" ]]
+then
+  echo password:
+  read -s password
+fi
+
+kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm $authrealm --user $username --password $password
+
+LDAP_ID=$(kcadm.sh get components -q name=ldap -r $realm | jq -r '.[0].id')
+kcadm.sh create user-storage/${LDAP_ID}/sync?action=triggerFullSync -r $realm

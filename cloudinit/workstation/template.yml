@@ -80,6 +80,11 @@ write_files:
   permissions: '0755'
   #@yaml/text-templated-strings
   content: #@ data.values.add_app_role_script
+- path: /usr/local/bin/sync-realm
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: #@ data.values.synccmd
 - path: /etc/firefox/policies/policies.json
   owner: root:root
   permissions: '0644'

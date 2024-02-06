@@ -17,4 +17,5 @@ write_snippet workstation.yml -f ${SCRIPT_DIR}/template.yml -f ${SCRIPT_DIR}/../
   --data-value-file addldapusertogroup=${SCRIPT_DIR}/../ldap/scripts/addldapusertogroup \
   --data-value-file enable_k8s_auth_script=${SCRIPT_DIR}/../vault/scripts/enable-k8s-auth.sh \
   --data-value-file add_k8s_sa_script=${SCRIPT_DIR}/../vault/scripts/add-k8s-service-account.sh \
-  --data-value-file add_app_role_script=${SCRIPT_DIR}/../vault/scripts/add-app-role.sh
+  --data-value-file add_app_role_script=${SCRIPT_DIR}/../vault/scripts/add-app-role.sh \
+  --data-value-file synccmd=${SCRIPT_DIR}/../keycloak/scripts/sync-realm
