@@ -11,3 +11,10 @@ export IP=$(./workspace/proxmox/ips next)
 
 ## Connect
 Use remote desktop to connect to workstation.home.arpa and login with LDAP
+
+## First time setup
+
+`source ~/.homelab` to:
+* generate an ssh keypair
+* initialize the `step cli`
+* fetch kubeconfigs
