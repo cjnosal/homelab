@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo prepare workspace
-ssh root@192.168.2.200 mkdir -p /root/workspace/
-scp -r ./cloudinit ./proxmox root@192.168.2.200:/root/workspace/
+./sync.sh
+
+if [[ "$#" == "1" && "$1" == "--reset" ]]
+then
+  echo reset environment
+  time ssh root@192.168.2.200 ./workspace/proxmox/reset.sh
+fi
 
 echo initialize environment
 time ssh root@192.168.2.200 ./workspace/proxmox/init.sh | tee init.log
