@@ -60,6 +60,15 @@ path "ssh-client-signer/sign/ssh-role" {
 }
 EOF
 
+vault policy write dns-ops -<<EOF
+path "ssh-client-signer/roles/*" {
+ capabilities = ["list"]
+}
+path "ssh-client-signer/sign/dns-role" {
+ capabilities = ["create","update"]
+}
+EOF
+
 vault auth enable oidc
 vault auth enable ldap
 vault auth enable approle
@@ -88,6 +97,20 @@ vault write ssh-client-signer/roles/ssh-role -<<EOF
   "default_extensions": { "permit-pty": "" },
   "key_type": "ca",
   "default_user": "ops",
+  "ttl": "30m0s"
+}
+EOF
+
+vault write ssh-client-signer/roles/dns-role -<<EOF
+{
+  "algorithm_signer": "rsa-sha2-256",
+  "allow_user_certificates": true,
+  "allowed_users": "dns-ops",
+  "allowed_users_template": true,
+  "allowed_extensions": "permit-pty",
+  "default_extensions": { "permit-pty": "" },
+  "key_type": "ca",
+  "default_user": "dns-ops",
   "ttl": "30m0s"
 }
 EOF
@@ -148,6 +171,26 @@ vault write auth/oidc/role/ssh-ops -<<EOF
 }
 EOF
 
+vault write auth/oidc/role/dns-ops -<<EOF
+{
+  "bound_audiences": "vault",
+  "allowed_redirect_uris": [
+    "https://vault.${ZONE}:8200/ui/vault/auth/oidc/oidc/callback",
+    "https://vault.${ZONE}:8250/oidc/callback",
+    "http://localhost:8250/oidc/callback"
+  ],
+  "user_claim": "preferred_username",
+  "token_policies": [
+    "dns-ops"
+  ],
+  "bound_claims": {
+    "groups": [
+      "dns-ops"
+    ]
+  }
+}
+EOF
+
 vault write auth/ldap/config \
   url=ldaps://ldap.${ZONE} \
   userdn="ou=People,${SUFFIX}" \
@@ -160,6 +203,7 @@ vault write auth/ldap/config \
 vault write auth/ldap/groups/vault-admin policies=vault-admin policies=kv-user policies=infrastructure-user
 vault write auth/ldap/groups/vault-user policies=kv-user
 vault write auth/ldap/groups/ssh-ops policies=ssh-ops
+vault write auth/ldap/groups/dns-ops policies=dns-ops
 
 add-app-role.sh --app ssh-host --owner ssh-ops --policy - << EOF
 path "ssh-host-signer/roles/*" {

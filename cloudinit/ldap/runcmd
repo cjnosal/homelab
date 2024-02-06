@@ -67,6 +67,7 @@ addldapgroup step-provisioner-admin
 addldapgroup vault-user
 addldapgroup vault-admin
 addldapgroup ssh-ops
+addldapgroup dns-ops
 addldapgroup ldap-admin
 addldapgroup k8s-core-admin
 addldapgroup k8s-run-admin
@@ -88,6 +89,7 @@ addldapusertogroup $USERNAME step-provisioner-admin
 addldapusertogroup $USERNAME vault-user
 addldapusertogroup $USERNAME vault-admin
 addldapusertogroup $USERNAME ssh-ops
+addldapusertogroup $USERNAME dns-ops
 addldapusertogroup $USERNAME ldap-admin
 addldapusertogroup $USERNAME k8s-core-admin
 addldapusertogroup $USERNAME k8s-run-admin

@@ -12,5 +12,7 @@ chgrp bind /etc/bind/named.conf.local
 chgrp bind /etc/bind/named.conf.options
 chgrp bind /etc/bind/named.conf.tsigkeys
 
+chmod -R g+w /etc/bind/named.conf.*
+
 systemctl enable named
 systemctl start named

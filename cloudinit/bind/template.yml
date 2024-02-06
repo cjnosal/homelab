@@ -3,6 +3,17 @@
 #@overlay/match by=overlay.all,expects="0+"
 #@overlay/match-child-defaults missing_ok=True
 ---
+groups:
+- bind
+users:
+- name: dns-ops
+  homedir: /home/dns-ops
+  shell: /bin/bash
+  lock_passwd: True
+  gecos: DNS Ops Team
+  groups: [bind]
+  sudo: |
+    ALL=(root) NOPASSWD: /usr/local/bin/addhost.sh, /usr/local/bin/removehost.sh, /usr/local/bin/aliashost.sh, /usr/local/bin/add-update-policy.sh, /usr/local/bin/add-allow-transfer.sh, /usr/sbin/rndc
 write_files:
 - path: /etc/bind/named.conf
   owner: root:root
