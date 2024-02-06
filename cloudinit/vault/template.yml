@@ -98,6 +98,16 @@ write_files:
     >&2 echo -e "Save the key below. It will not be displayed again:\n\n"
 
     vault operator rekey -format json -nonce $VAULT_NONCE $VAULT_UNSEAL_KEY | jq -r .keys[0]
+- path: /usr/local/bin/enable-k8s-auth.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: #@ data.values.enable_k8s_auth_script
+- path: /usr/local/bin/add-k8s-service-account.sh
+  owner: root:root
+  permissions: '0755'
+  #@yaml/text-templated-strings
+  content: #@ data.values.add_k8s_sa_script
 - path: /usr/local/bin/add-app-role.sh
   owner: root:root
   permissions: '0755'

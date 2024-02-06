@@ -402,6 +402,17 @@ spec:
 EOF
 fi
 
+# vault connection
+helm repo add hashicorp https://helm.releases.hashicorp.com
+
+kubectl create namespace vault-secrets-operator-system
+kubectl label namespace vault-secrets-operator-system 'smallstep.com/inject'="enabled"
+helm upgrade --install vault-secrets-operator hashicorp/vault-secrets-operator -n vault-secrets-operator-system --wait \
+  --set "defaultVaultConnection.enabled=true" \
+  --set "defaultVaultConnection.address=https://vault.home.arpa:8200" \
+  --set "defaultVaultConnection.caCertSecret=home.arpa"
+
+
 # Allow admins full access
 cat <<EOF | kubectl apply -f -
 ---

@@ -17,4 +17,6 @@ export YTT_fullchain_path=/opt/vault/tls/tls.crt
 export YTT_privkey_path=/opt/vault/tls/tls.key
 
 write_snippet vault.yml  -f ${SCRIPT_DIR}/template.yml \
-  --data-value-file add_app_role_script=${SCRIPT_DIR}/scripts/add-app-role.sh
+  --data-value-file add_app_role_script=${SCRIPT_DIR}/scripts/add-app-role.sh \
+  --data-value-file enable_k8s_auth_script=${SCRIPT_DIR}/scripts/enable-k8s-auth.sh \
+  --data-value-file add_k8s_sa_script=${SCRIPT_DIR}/scripts/add-k8s-service-account.sh
