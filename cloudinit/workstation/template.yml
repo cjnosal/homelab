@@ -126,6 +126,10 @@ write_files:
           {
             "name": "Vault",
             "url": "https://vault.home.arpa:8200/ui/vault/auth?with=oidc"
+          },
+          {
+            "name": "Harbor",
+            "url": "https://harbor.eng.home.arpa"
           }
         ]
       }
@@ -225,5 +229,6 @@ packages:
  - jq
  - openjdk-19-jre-headless
  - thunderbird
+ - apache2-utils
 runcmd:
-- /root/runcmd
+- #@ "/root/runcmd {}".format(data.values.username)

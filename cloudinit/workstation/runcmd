@@ -4,6 +4,8 @@ set -euo pipefail
 ZONE=home.arpa
 SUFFIX='dc=home,dc=arpa'
 
+USERNAME=$1
+
 debconf-set-selections <<EOF
 nslcd nslcd/ldap-reqcert string demand
 nslcd nslcd/ldap-uris string ldaps://ldap.${ZONE}/
@@ -57,5 +59,23 @@ chmod a+rx /usr/local/bin/pinniped
 
 snap install helm --classic
 snap install kubectl --classic
+snap install yq
+
+apt-get install -y docker.io docker-compose
+usermod -aG docker $USERNAME
+
+export USERNAME
+
+wget --progress=dot:giga https://github.com/docker/docker-credential-helpers/releases/download/v0.8.1/docker-credential-secretservice-v0.8.1.linux-amd64 \
+  -O /usr/local/bin/docker-credential-secretservice
+chmod a+rx /usr/local/bin/docker-credential-secretservice
+
+mkdir -p /home/${USERNAME}/.docker
+cat > /home/${USERNAME}/.docker/config.json <<EOF
+{
+  "credsStore": "secretservice"
+}
+EOF
+chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.docker
 
 shutdown -r +1

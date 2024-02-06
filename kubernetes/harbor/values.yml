@@ -1,0 +1,32 @@
+expose:
+  type: loadBalancer
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: "tls"
+  loadBalancer:
+    name: harbor-lb
+    ports:
+      httpPort: 80
+      httpsPort: 443
+    annotations:
+      external-dns.alpha.kubernetes.io/hostname: harbor.eng.home.arpa
+
+externalURL: https://harbor.eng.home.arpa
+
+existingSecretAdminPassword: admin
+
+caSecretName: "tls"
+caBundleSecretName: "home.arpa"
+
+existingSecretSecretKey: "encryption"
+
+core:
+  secretName: "encryption"
+
+registry:
+  credentials:
+    existingSecret: login
+
+logLevel: info
