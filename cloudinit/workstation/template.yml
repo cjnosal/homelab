@@ -130,6 +130,10 @@ write_files:
           {
             "name": "Harbor",
             "url": "https://harbor.eng.home.arpa"
+          },
+          {
+            "name": "Gitlab",
+            "url": "https://gitlab.eng.home.arpa"
           }
         ]
       }

@@ -1,0 +1,136 @@
+global:
+  ## https://docs.gitlab.com/charts/installation/deployment#deploy-the-community-edition
+  edition: ce
+
+  certificates:
+    customCAs:
+    - secret: home.arpa
+      keys: 
+      - ca.crt
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-host-settings
+  hosts:
+    domain: eng.home.arpa
+    https: true
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-ingress-settings
+  ingress:
+    apiVersion: "networking.k8s.io/v1"
+    configureCertmanager: false
+    provider: traefik
+    class: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: step-issuer
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+    enabled: true
+    tls:
+       enabled: true
+       secretName: tls-wildcard
+    path: /
+    pathType: Prefix
+
+  ## Initial root password for this GitLab installation
+  initialRootPassword:
+    secret: gitlab-initial-root-password
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-postgresql-settings
+  psql:
+    password:
+      secret: psql-password
+      key: password
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-redis-settings
+  redis:
+    auth:
+      enabled: true
+      secret: redis-password
+      key: password
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-gitaly-settings
+  gitaly:
+    enabled: true
+    authToken:
+      secret: gitaly-token
+      key: token
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-minio-settings
+  minio:
+    enabled: true
+    credentials:
+      secret: minio-keys
+
+  ## https://docs.gitlab.com/charts/charts/globals#configure-appconfig-settings
+  ## Rails based portions of this chart share many settings
+  appConfig:
+
+    ## https://docs.gitlab.com/charts/charts/globals#ldap
+    ldap:
+      # prevent the use of LDAP for sign-in via web.
+      preventSignin: false
+      servers:
+        # 'main' is the GitLab 'provider ID' of this LDAP server
+        main:
+          label: 'homelab LDAP'
+          host: 'ldap.home.arpa'
+          port: 636
+          encryption: simple_tls
+          uid: 'uid'
+          bind_dn: 'uid=gitlab,ou=Systems,dc=home,dc=arpa'
+          base: 'ou=People,dc=home,dc=arpa'
+          group_base: 'ou=groups,dc=home,dc=arpa'
+          admin_group: 'gitlab-admin'
+          password:
+            secret: ldap-password
+            key: password
+
+  ## End of global.appConfig
+
+  email:
+    display_name: Gitlab
+    from: gitlab-notifications@home.arpa 
+    reply_to: no-reply@home.arpa
+  smtp:
+    enabled: true
+    address: mail.home.arpa
+    port: 587
+    starttls_auto: true
+    authentication: ""
+## End of global
+
+gitlab: 
+  webservice: 
+    minReplicas: 1
+    ingress: 
+      tls: 
+        secretName: tls-web
+  gitlab-shell:
+    traefik:
+      entrypoint: "ssh"
+registry: 
+  ingress: 
+    tls: 
+      secretName: tls-registry
+minio: 
+  ingress: 
+    tls: 
+      secretName: tls-minio
+gitlab-runner:
+  install: false
+
+certmanager-issuer:
+  email: gitlab@home.arpa
+
+# cert manager already installed
+certmanager:
+  installCRDs: false
+  install: false
+  rbac:
+    create: false
+
+# traefik controller already installed
+nginx-ingress:
+  enabled: false
+traefik:
+  install: false
