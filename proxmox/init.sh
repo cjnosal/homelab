@@ -149,7 +149,7 @@ EOF
 
 ./workspace/proxmox/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
 
-./workspace/proxmox/preparevm --vmname mail
+./workspace/proxmox/preparevm --vmname mail -- --disk 8
 DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
 sudo cat /etc/opendkim/mail.txt | cut -d'(' -f2 | cut -d')' -f1 | xargs
 EOF
