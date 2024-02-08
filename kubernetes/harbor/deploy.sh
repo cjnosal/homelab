@@ -180,4 +180,4 @@ spec:
           }
           EOB
 EOF
-kubectl wait -n harbor job config-auth --timeout=2m --for=condition=completed=true
+kubectl wait -n harbor job config-auth --timeout=2m --for=condition=complete=true
