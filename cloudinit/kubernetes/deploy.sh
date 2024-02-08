@@ -90,8 +90,14 @@ metadata:
 EOF
 
 # ingress
-kapp deploy -y -a ingress-nginx -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.5/deploy/static/provider/cloud/deploy.yaml
-kubectl patch ingressclass nginx -p '{"metadata": {"annotations":{"ingressclass.kubernetes.io/is-default-class":"true"}}}'
+helm repo add traefik https://traefik.github.io/charts
+helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namespace \
+  --set providers.kubernetesIngress.publishedService.enabled=true \
+  --set ports.ssh.port=2222 \
+  --set ports.ssh.expose=true \
+  --set ports.ssh.exposedPort=22 \
+  --set logs.general.level=INFO \
+  --set logs.access.enabled=true
 
 # tls
 STEP_CA=$(curl -fSsL https://step.home.arpa:8443/step_root_ca.crt)
@@ -118,7 +124,11 @@ spec:
     solvers:
     - http01:
         ingress:
-          ingressClassName: nginx
+          ingressClassName: traefik
+          ingressTemplate:
+            metadata:
+              annotations:
+                traefik.ingress.kubernetes.io/router.entrypoints: web
 EOF
 
 if [[ -n "$cert_manager_tsig_name" ]]
@@ -339,6 +349,17 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - traefik.containo.us
+  - traefik.io
+  resources:
+  - ingressroutes
+  - ingressroutetcps
+  - ingressrouteudps
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -393,6 +414,7 @@ spec:
         - --rfc2136-min-ttl=300s
         - --source=ingress
         - --source=service
+        - --source=traefik-proxy
         - --domain-filter=.${subdomain}.home.arpa
         - --policy=sync
         - --log-level=info

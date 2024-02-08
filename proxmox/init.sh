@@ -185,8 +185,10 @@ tsig-keygen -a hmac-sha512 k8s-run-external-dns >> /etc/bind/named.conf.tsigkeys
 add-update-policy.sh "grant k8s-core-cert-manager name _acme-challenge.pinniped.eng.home.arpa txt;"
 add-update-policy.sh "grant k8s-core-external-dns wildcard *.eng.home.arpa a;"
 add-update-policy.sh "grant k8s-core-external-dns wildcard *.eng.home.arpa txt;"
+add-update-policy.sh "grant k8s-core-external-dns wildcard *.eng.home.arpa cname;"
 add-update-policy.sh "grant k8s-run-external-dns wildcard *.apps.home.arpa a;"
 add-update-policy.sh "grant k8s-run-external-dns wildcard *.apps.home.arpa txt;"
+add-update-policy.sh "grant k8s-run-external-dns wildcard *.apps.home.arpa cname;"
 add-allow-transfer.sh "key k8s-core-external-dns;"
 add-allow-transfer.sh "key k8s-run-external-dns;"
 EOF
