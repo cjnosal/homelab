@@ -1,0 +1,2 @@
+# User rules for dns-ops
+dns-ops ALL=(root) NOPASSWD: /usr/local/bin/addhost.sh, /usr/local/bin/removehost.sh, /usr/local/bin/aliashost.sh, /usr/local/bin/add-update-policy.sh, /usr/local/bin/add-allow-transfer.sh, /usr/sbin/rndc

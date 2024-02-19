@@ -1,0 +1,13 @@
+$TTL 604800
+@ IN SOA ${hostname}.${zone}. root.${hostname}.${zone}. (
+         2022072651 ; Serial
+         3600 ; Refresh
+         180 ; Retry
+         604800 ; Expire
+         180 ; Negative Cache TTL
+)
+;Name Server Information
+@ IN NS ${hostname}.${zone}.
+
+;IP address of Your Domain Name Server(DNS)
+${hostname} IN A ${ip}

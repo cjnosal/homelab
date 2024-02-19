@@ -13,10 +13,10 @@ help_userdata="filename of the cloudinit user data configuration in the proxmox 
 
 source ${SCRIPT_DIR}/../cloudinit/argshelper
 
-parseargs $@
+parseargs "$@"
 requireargs vmname
 
-userdata=${userdata:-$vmname}
+userdata=${userdata-$vmname}
 
 echo set up ${vmname}
 export ip=$(./workspace/proxmox/ips next)
@@ -26,8 +26,13 @@ then
   ssh ubuntu@bind.home.arpa addhost.sh ${vmname} $ip
 fi
 
-./workspace/cloudinit/${userdata}/generate.sh $ip
-./workspace/proxmox/newvm --vmname ${vmname} --userdata ${userdata}.yml ${PASSTHROUGH[@]}
+if [[ -n "${userdata}" ]]
+then
+  ./workspace/cloudinit/${userdata}/generate.sh $ip
+  ./workspace/proxmox/newvm --vmname ${vmname} --userdata ${userdata}.yml ${PASSTHROUGH[@]}
+else
+  ./workspace/proxmox/newvm --vmname ${vmname} ${PASSTHROUGH[@]}
+fi
 
 if [[ "${skip_domain:-}" != "1" ]]
 then

@@ -1,0 +1,3 @@
+update-policy {
+      grant local-ddns zonesub any;
+};

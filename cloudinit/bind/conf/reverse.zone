@@ -1,0 +1,14 @@
+$TTL 86400
+@ IN SOA ${zone}. root.${zone}. (
+         2022072752 ;Serial
+         3600 ;Refresh
+         180 ;Retry
+         604800 ;Expire
+         86400 ;Minimum TTL
+)
+;Your Name Server Info
+@ IN NS ${hostname}.${zone}.
+${hostname} IN A ${ip}
+
+;Reverse Lookup for Your DNS Server
+${ptr} IN PTR ${hostname}.${zone}.

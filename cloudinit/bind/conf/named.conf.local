@@ -1,0 +1,13 @@
+zone "${zone}" IN {
+        type master;
+        file "/var/lib/bind/forward.${zone}";
+        include "/etc/bind/named.conf.update-policy";
+        include "/etc/bind/named.conf.allow-transfer";
+};
+zone "${reverse_zone}" IN {
+        type master;
+        file "/var/lib/bind/reverse.${zone}";
+        update-policy {
+          grant local-ddns zonesub any;
+        };
+};

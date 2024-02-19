@@ -1,18 +1,83 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ZONE=home.arpa
+# args
+OPTIONS=(forwarders network zone reverse_zone)
+
+help_this="initialize bind server"
+help_forwarders="upstream dns servers (; delimited)"
+help_network="internal network cidr"
+help_zone="forward dns zone"
+help_reverse_zone="reverse zone"
+
+export hostname=$(hostname)
+export ip=$(hostname -I | sed -e 's/ $//')
+export ptr=$(cut -d'.' -f 4 <<< $ip)
+
+cd init
+
+cp argshelper /usr/local/include
+
+cd bind
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs forwarders network zone reverse_zone
+
+# packages
+apt-get install -y  bind9 bind9utils bind9-doc dnsutils
+
+# users
+
+id -u dns-ops || adduser --home /home/dns-ops --shell /bin/bash --disabled-password --gecos "DNS Ops Team" dns-ops
+adduser dns-ops bind
+
+# conf
+mkdir -p /etc/bind
+cp conf/named.conf conf/named.conf.allow-transfer conf/named.conf.update-policy /etc/bind/
+cp conf/named /etc/default/
+cp conf/sudoers /etc/sudoers.d/91-dns-ops
+
+if ! grep -q ';$' <<< "$forwarders"
+then
+	forwarders="${forwarders};"
+fi
+
+sed -e "s:\${network}:$network:g" -e "s/\${forwarders}/$forwarders/g" conf/named.conf.options > /etc/bind/named.conf.options
+sed -e "s/\${zone}/$zone/g" -e "s/\${reverse_zone}/$reverse_zone/g" conf/named.conf.local > /etc/bind/named.conf.local
+sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$hostname/g" -e "s/\${ip}/$ip/g" conf/forward.zone > /var/lib/bind/forward.${zone}
+sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$hostname/g" -e "s/\${ip}/$ip/g" -e "s/\${ptr}/$ptr/g" conf/reverse.zone > /var/lib/bind/reverse.${zone}
+
+cat > /usr/local/include/bind.env << EOF
+ZONE=$zone
+REV_ZONE=$reverse_zone
+EOF
 
 touch /etc/bind/named.conf.tsigkeys
 chmod 440 /etc/bind/named.conf.tsigkeys
 
-chgrp bind /var/lib/bind/reverse.${ZONE}
-chgrp bind /var/lib/bind/forward.${ZONE}
+chgrp bind /var/lib/bind/reverse.${zone}
+chgrp bind /var/lib/bind/forward.${zone}
+chown -R bind /var/lib/bind/*
+
 chgrp bind /etc/bind/named.conf.local
 chgrp bind /etc/bind/named.conf.options
 chgrp bind /etc/bind/named.conf.tsigkeys
 
+chgrp bind /etc/default/named
+
 chmod -R g+w /etc/bind/named.conf.*
 
+# scripts
+cp scripts/* /usr/local/bin/
+
+# services
 systemctl enable named
-systemctl start named
+systemctl restart named
+systemctl is-active named --wait
+
+# smoke test
+[[ "$(dig @${ip} -4 -tA ${hostname}.${zone}. +noall +answer | awk '{print $5}')" == "${ip}" ]]
+[[ "$(dig @${ip} -4 -tPTR ${ptr}.${reverse_zone}. +noall +answer | awk '{print $5}')" == "${hostname}.${zone}." ]]
+
+echo success
