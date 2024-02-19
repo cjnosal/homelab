@@ -266,6 +266,59 @@ EOD
 
 EOF
 
+# boostrap vm
+${SCRIPT_DIR}/preparevm --vmname bootstrap -- --disk 8
+scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
+  ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
+  ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../kubernetes \
+  ${SCRIPT_DIR}/../cloudinit/user.yml \
+  ubuntu@bootstrap.${domain}:/home/ubuntu/init
+scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@bootstrap.${domain}:/home/ubuntu/init/certs
+scp -r ./kubernetes ubuntu@bootstrap.${domain}:/home/ubuntu/init/kubernetes
+ssh ubuntu@bootstrap.${domain} mkdir -p /home/ubuntu/init/creds/
+scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+scp ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+ssh ubuntu@bootstrap.${domain} sudo bash << EOF
+set -euo pipefail
+/home/ubuntu/init/workstation/runcmd --domain "${domain}"
+ssh-keygen -t rsa -f ~/.ssh/id_rsa -C bootstrap@${domain} -N ""
+EOF
+
+# minio
+ssh ubuntu@bootstrap.${domain} bash << EOF
+set -euo pipefail
+
+export LDAP_BIND_UID="bootstrap"
+export LDAP_BIND_PW="\$(cat /home/ubuntu/init/creds/ldap_bootstrap.passwd)"
+source /usr/local/include/ldap.env
+
+addldapsystem minio Minio
+
+if [[ ! -f /home/ubuntu/init/creds/minio_ldap.passwd ]]
+then
+  ldapcred=\$(generatecred)
+  echo \$ldapcred > /home/ubuntu/init/creds/minio_ldap.passwd
+  chmod 400 /home/ubuntu/init/creds/minio_ldap.passwd
+else
+  ldapcred=\$(cat /home/ubuntu/init/creds/minio_ldap.passwd)
+fi
+
+ldappasswd -x -D uid=bootstrap,ou=people,\${SUFFIX} -w \${LDAP_BIND_PW} -s \$ldapcred -S uid=minio,ou=systems,\${SUFFIX} -H ldaps://\${HOST}
+EOF
+
+scp ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/minio_ldap.passwd ${SCRIPT_DIR}/../creds/
+
+${SCRIPT_DIR}/preparevm --vmname minio -- --data_disk 8
+scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/minio \
+  ubuntu@minio.${domain}:/home/ubuntu/init
+scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@minio.${domain}:/home/ubuntu/init/certs
+ssh ubuntu@minio.${domain} mkdir -p /home/ubuntu/init/creds/
+scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ${SCRIPT_DIR}/../creds/minio_ldap.passwd ubuntu@minio.${domain}:/home/ubuntu/init/creds/
+ssh ubuntu@minio.${domain} sudo bash << EOF
+/home/ubuntu/init/minio/runcmd --domain "${domain}" --subdomain minio --acme "https://step.${domain}" \
+  --ldap ldap.${domain}:636
+EOF
+
 # k8s oidc login
 ssh -o LogLevel=error ubuntu@keycloak.${domain} bash > ${SCRIPT_DIR}/../creds/k8s-pinniped-client-secret << EOF
 set  -euo pipefail
@@ -312,20 +365,10 @@ ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addre
   --version v1.28
 fi
 
-${SCRIPT_DIR}/preparevm --vmname bootstrap -- --disk 8
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
-  ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
-  ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../kubernetes \
-  ${SCRIPT_DIR}/../cloudinit/user.yml \
-  ubuntu@bootstrap.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@bootstrap.${domain}:/home/ubuntu/init/certs
-scp -r ./kubernetes ubuntu@bootstrap.${domain}:/home/ubuntu/init/kubernetes
-ssh ubuntu@bootstrap.${domain} mkdir -p /home/ubuntu/init/creds/
-scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
-scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+# kubernetes deployments
+scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@bootstrap.${domain} sudo bash << EOF
 set -euo pipefail
-/home/ubuntu/init/workstation/runcmd --domain "${domain}"
 
 export LDAP_BIND_UID="bootstrap"
 export LDAP_BIND_PW="\$(cat /home/ubuntu/init/creds/ldap_bootstrap.passwd)"
@@ -335,9 +378,6 @@ user=\$(yq .username /home/ubuntu/init/user.yml)
 
 /home/ubuntu/init/kubernetes/gitlab/prereqs.sh -all --gitlab_admin \${user}
 /home/ubuntu/init/kubernetes/gitlab/deploy.sh
-
-# ssh cert needed to update dns configuration
-ssh-keygen -t rsa -f ~/.ssh/id_rsa -C bootstrap@${domain} -N ""
 
 /home/ubuntu/init/kubernetes/harbor/prereqs.sh -all --harbor_admin \${user}
 /home/ubuntu/init/kubernetes/harbor/deploy.sh

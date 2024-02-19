@@ -127,6 +127,7 @@ addldapgroup dns-ops
 addldapgroup ldap-admin
 addldapgroup k8s-core-admin
 addldapgroup k8s-run-admin
+addldapgroup minio-admin
 
 # initial admin
 
@@ -159,6 +160,7 @@ do
   addldapusertogroup $admin ldap-admin
   addldapusertogroup $admin k8s-core-admin
   addldapusertogroup $admin k8s-run-admin
+  addldapusertogroup $admin minio-admin
 done
 
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $bootstrapcred -S uid=bootstrap,ou=people,${suffix}

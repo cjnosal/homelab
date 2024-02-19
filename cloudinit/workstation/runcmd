@@ -6,7 +6,7 @@ pushd ${SCRIPT_DIR}
 
 # args
 FLAGS=(desktop)
-OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step)
+OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step minio)
 
 help_this="initialize workstation"
 help_domain="parent domain of this environment"
@@ -19,6 +19,7 @@ help_keycloak="url of keycloak host"
 help_vault="url of vault host"
 help_harbor="url of harbor host"
 help_gitlab="url of gitlab host"
+help_minio="url of minio host"
 help_desktop="install desktop environment"
 
 
@@ -42,6 +43,7 @@ keycloak=${keycloak:-keycloak.${domain}:8443}
 vault=${vault:-vault.${domain}:8200}
 harbor=${harbor:-harbor.eng.${domain}}
 gitlab=${gitlab:-gitlab.eng.${domain}}
+minio=${minio:-minio.${domain}:9000}
 
 
 # ldap dc components from $domain
@@ -92,12 +94,13 @@ then
   mkdir -p /usr/lib/thunderbird/distribution
   cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
   mkdir -p /etc/firefox/policies
-  sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  \
+  sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" \
+    -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  -e "s|\${minio}|$minio|g"  \
     conf/firefox-policies.json > /etc/firefox/policies/policies.json
 fi
 
 # scripts
-sed -e "s|\${vault}|$vault|g" -e "s|\${step}|$step|g" -e "s|\${domain}|$domain|g"  scripts/.homelab > /etc/skel/.homelab
+sed -e "s|\${vault}|$vault|g" -e "s|\${step}|$step|g" -e "s|\${domain}|$domain|g" -e "s|\${minio}|$minio|g"  scripts/.homelab > /etc/skel/.homelab
 chmod a+rx /etc/skel/.homelab
 cp ../ldap/scripts/* /usr/local/bin/
 cp ../ldap/include/* /usr/local/include/
@@ -147,6 +150,11 @@ apt-get install -y docker.io docker-compose
 wget --progress=dot:giga https://github.com/docker/docker-credential-helpers/releases/download/v0.8.1/docker-credential-secretservice-v0.8.1.linux-amd64 \
   -O /usr/local/bin/docker-credential-secretservice
 chmod a+rx /usr/local/bin/docker-credential-secretservice
+
+wget --progress=dot:giga https://dl.min.io/client/mc/release/linux-amd64/mc \
+  -O /usr/local/bin/mc
+
+chmod +x /usr/local/bin/mc
 
 # user
 if [[ -n "${userfile}" ]]

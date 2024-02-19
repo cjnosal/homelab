@@ -10,7 +10,7 @@ memory=${memory:-4096}
 cores=${cores:-2}
 disk=${disk:-4}
 
-OPTIONS=(template_name vmname memory cores disk nameserver ip host domain gateway subnet sshpubkey sshprivkey lvm_storage node)
+OPTIONS=(template_name vmname memory cores disk data_disk nameserver ip host domain gateway subnet sshpubkey sshprivkey lvm_storage node)
 
 help_this="create a new vm"
 help_template_name="name of the VM template to clone"
@@ -18,6 +18,7 @@ help_vmname="unique name for the new VM"
 help_memory="RAM to allocate in MB (default 4096)"
 help_cores="CPU cores to allocate (default 2)"
 help_disk="boot disk size in GB (default 4)"
+help_data_disk="optional data disk size in GB"
 help_nameserver="IP address of DNS resolver"
 help_ip="IP address of new VM (default will reuse address of {vmname}.{domain} if present in DNS, otherwise increment available IP)"
 help_domain="parent domain of this environment"
@@ -80,6 +81,12 @@ rawurlencode() {
 }
 encoded_key=$(rawurlencode < $sshpubkey)
 
+data_disk_args=""
+if [[ -n "$data_disk" ]]
+then
+  data_disk_args="--data-urlencode scsi1=${lvm_storage}:$data_disk"
+fi
+
 curl -X PUT -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu/${VMID}/config" \
   -d vmid=${VMID} \
   -d node=${node} \
@@ -89,7 +96,8 @@ curl -X PUT -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu
   -d searchdomain=${domain} \
   -d cores=${cores} \
   -d memory=${memory} \
-  --data-urlencode sshkeys="${encoded_key}" > /dev/null
+  --data-urlencode sshkeys="${encoded_key}" \
+  $data_disk_args > /dev/null
 
 if [[ -n "$disk" ]]
 then
@@ -101,7 +109,6 @@ then
   | jq -r .data)
   ${SCRIPT_DIR}/api/waitfortask --task $RESIZE_TASK
 fi
-
 
 ## start vm
 

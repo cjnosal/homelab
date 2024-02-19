@@ -42,6 +42,10 @@
       {
         "name": "Gitlab",
         "url": "https://${gitlab}"
+      },
+      {
+        "name": "Minio",
+        "url": "https://${minio}"
       }
     ]
   }

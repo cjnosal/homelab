@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+pushd ${SCRIPT_DIR}
+
+# args
+OPTIONS=(domain acme ldap subdomain)
+
+help_this="initialize minio s3-compatible store"
+help_domain="parent domain of this environment"
+help_acme="acme directory url to acquire TLS cert"
+help_ldap="url of LDAP host"
+help_subdomain="subdomain for this service (defaults to hostname)"
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs domain acme ldap
+
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
+
+# ldap dc components from $domain
+export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
+
+if [[ ! -f /root/minio_admin.passwd ]]
+then
+  admincred=$(generatecred)
+  echo $admincred > /root/minio_admin.passwd
+  chmod 400 /root/minio_admin.passwd
+else
+  admincred=$(cat /root/minio_admin.passwd)
+fi
+
+
+# packages
+apt-get install file
+
+wget --progress=dot:giga https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20240406052602.0.0_amd64.deb -O minio.deb
+dpkg -i minio.deb
+
+wget --progress=dot:giga https://dl.min.io/client/mc/release/linux-amd64/mc \
+  -O /usr/local/bin/mc
+
+chmod +x /usr/local/bin/mc
+
+
+# add data disk
+LABEL=data
+DEVICE=/dev/sdb
+MOUNTPATH=/mnt/data
+
+parted ${DEVICE} print | grep -q gpt || parted ${DEVICE} mklabel gpt
+parted ${DEVICE} print | grep -q $LABEL || parted ${DEVICE} mkpart $LABEL ext4 0% 100%
+
+while [[ ! -b ${DEVICE}1 ]]
+do
+  echo waiting for ${DEVICE}1
+  sleep 2
+done
+file -sL ${DEVICE}1 | grep -q ext4 || mkfs.ext4 ${DEVICE}1
+
+mkdir -p ${MOUNTPATH}
+mount -t auto ${DEVICE}1 ${MOUNTPATH}
+
+echo "PARTLABEL=$LABEL $MOUNTPATH ext4 rw,errors=continue 0 2" >> /etc/fstab
+#(mount at path, dump not required, check disk after boot disk)
+
+
+# user
+groupadd -r minio-user
+useradd -M -r -g minio-user minio-user
+chown minio-user:minio-user ${MOUNTPATH}
+
+# setup
+initcertbot --acme $acme --group minio-user --san ${subdomain}.${domain} \
+  --cert /opt/minio/certs/public.crt --key /opt/minio/certs/private.key --chain /opt/minio/CAs/ca.crt
+
+ldapcred=$(cat /home/ubuntu/init/creds/minio_ldap.passwd)
+cat > /etc/default/minio <<EOF
+MINIO_ROOT_USER=minio-root
+MINIO_ROOT_PASSWORD=${admincred}
+
+MINIO_VOLUMES="${MOUNTPATH}"
+
+MINIO_OPTS="--certs-dir /opt/minio/certs"
+
+MINIO_SERVER_URL="https://${subdomain}.${domain}:9000"
+
+MINIO_IDENTITY_LDAP_SERVER_ADDR="${ldap}"
+MINIO_IDENTITY_LDAP_USER_DN_SEARCH_BASE_DN="ou=people,${suffix}"
+MINIO_IDENTITY_LDAP_USER_DN_SEARCH_FILTER="(&(objectClass=inetOrgPerson)(uid=%s))"
+MINIO_IDENTITY_LDAP_GROUP_SEARCH_FILTER="(&(objectClass=groupOfNames)(member=%d))"
+MINIO_IDENTITY_LDAP_GROUP_SEARCH_BASE_DN="ou=groups,${suffix}"
+MINIO_IDENTITY_LDAP_TLS_SKIP_VERIFY="off"
+MINIO_IDENTITY_LDAP_SERVER_INSECURE="off"
+MINIO_IDENTITY_LDAP_SERVER_STARTTLS="off"
+MINIO_IDENTITY_LDAP_SRV_RECORD_NAME=""
+MINIO_IDENTITY_LDAP_COMMENT=""
+
+MINIO_IDENTITY_LDAP_LOOKUP_BIND_DN="uid=minio,ou=systems,${suffix}"
+MINIO_IDENTITY_LDAP_LOOKUP_BIND_PASSWORD="${ldapcred}"
+
+EOF
+
+systemctl enable minio.service
+systemctl start minio.service
+systemctl is-active minio --wait
+
+mc alias set minio https://${subdomain}.${domain}:9000 minio-root $admincred
+
+mc idp ldap policy attach minio --group=cn=minio-admin,ou=groups,${suffix} consoleAdmin
