@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(vault)
+
+help_this="fetch ssh client ca certificate"
+help_vault="vault server url"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs vault
+
+curl -fSsL -o /etc/ssh/trusted-user-ca-keys.pem ${vault}/v1/ssh-client-signer/public_key

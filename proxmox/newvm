@@ -23,7 +23,7 @@ help_disk="boot disk size in GB (default matches template)"
 help_nameserver="IP address of DNS resolver (default bind.home.arpa)"
 help_ip="IP address of new VM (default will reuse address of {vmname}.home.arpa if present in DNS, otherwise increment available IP)"
 
-source ${SCRIPT_DIR}/../cloudinit/argshelper
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
 parseargs $@
 requireargs template_name vmname

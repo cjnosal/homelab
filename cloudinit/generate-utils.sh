@@ -40,7 +40,7 @@ function write_snippet {
 	  --data-values-env YTT \
 	  --data-value-file ssh_authorized_keys=/root/.ssh/vm.pub \
 	  --data-value-file runcmd=${SCRIPT_DIR}/runcmd \
-	  --data-value-file argscmd=${WORKSPACE}/cloudinit/argshelper \
+	  --data-value-file argscmd=${WORKSPACE}/cloudinit/base/include/argshelper \
 	  $CA_ARGS $VAULT_ARGS $EXTRA_YTT_ARGS >> /var/lib/vz/snippets/$FILENAME
 
 	echo wrote /var/lib/vz/snippets/$FILENAME

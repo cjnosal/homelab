@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FLAGS=(insecure)
+OPTIONS=(host)
+
+help_this="fetch trusted root and intermediate TLS CAs"
+help_host="host url serving the CA certificates"
+help_insecure="skip verification of the host's TLS certificate for bootstrapping"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs host
+
+curlargs="fSsL"
+if [[ "$insecure" == "1" ]]
+then
+    curlargs="k${curlargs}"
+fi
+
+sudo curl -${curlargs} -o /usr/local/share/ca-certificates/step_root_ca.crt ${host}/step_root_ca.crt
+sudo curl -${curlargs} -o /usr/local/share/ca-certificates/step_intermediate_ca.crt ${host}/step_intermediate_ca.crt
+
+sudo chmod -R a+r /usr/local/share/ca-certificates/*.crt
+sudo update-ca-certificates

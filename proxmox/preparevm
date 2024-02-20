@@ -11,7 +11,7 @@ help_skip_domain="do not add DNS records for this host"
 help_vmname="unique name for the new VM"
 help_userdata="filename of the cloudinit user data configuration in the proxmox snippets directory"
 
-source ${SCRIPT_DIR}/../cloudinit/argshelper
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
 parseargs "$@"
 requireargs vmname

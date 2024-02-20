@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+pushd ${SCRIPT_DIR}
+
+cp include/argshelper /usr/local/include/
+
+# packages
+apt-get install -y jq
+
+# user
+id -u ops || adduser --home /home/ops --shell /bin/bash --disabled-password --gecos "Ops Team" ops
+
+# conf
+cp conf/sudoers /etc/sudoers.d/91-ops
+cp conf/sshd_ca.conf /etc/ssh/sshd_config.d/
+
+# scripts
+cp scripts/* /usr/local/bin/
+
+popd

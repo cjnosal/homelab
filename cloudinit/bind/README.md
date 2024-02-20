@@ -4,13 +4,11 @@ Create a bind9 dns server with a home.arpa zone on the VM's IPv4 /23 network
 
 # With cloudinit
 ## Create vm
-1. install ytt
-2. create bind server
 ```
 ./workspace/proxmox/preparevm --vmname bind --userdata "" --skip_domain -- --nameserver 192.168.3.1
 ./workspace/proxmox/waitforhost bind.home.arpa
 
-scp -r ./workspace/cloudinit/argshelper ./workspace/cloudinit/bind ubuntu@bind.home.arpa:/home/ubuntu/init
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/bind ubuntu@bind.home.arpa:/home/ubuntu/init
 ssh ubuntu@bind.home.arpa sudo bash << EOF
 /home/ubuntu/init/bind/runcmd --network "192.168.2.0/23" --forwarders "192.168.3.1" --zone "home.arpa" --reverse_zone "2.168.192.in-addr.arpa"
 EOF

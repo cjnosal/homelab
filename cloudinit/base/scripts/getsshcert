@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(vault roleid)
+
+help_this="generate an ssh server certificate"
+help_vault="vault server url"
+help_roleid="vault approle id authorized to sign server certificates"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs vault roleid
+
+PUB_KEY="$(cat /etc/ssh/ssh_host_rsa_key.pub)"
+VAULT_TOKEN=$(curl -fSsL ${vault}/v1/auth/approle/login --data "{\"role_id\":\"$roleid\"}" | jq -r .auth.client_token)
+curl -fSsL -X POST ${vault}/v1/ssh-host-signer/sign/hostrole -H"X-Vault-Token: $VAULT_TOKEN" \
+  --data "{\"public_key\":\"$PUB_KEY\",\"cert_type\":\"host\"}" | jq -r .data.signed_key > /etc/ssh/ssh_host_rsa_key-cert.pub
+
+systemctl restart sshd

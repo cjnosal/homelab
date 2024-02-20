@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(acme san group fullchain chain cert key)
+
+help_this="install certbot and acquire a certificate from the smallstep CA via http01"
+help_acme="acme directory url"
+help_san="desired SAN"
+help_group="linux group to grant read access to generated certs and keys"
+help_fullchain="desired location of a fullchain pem (containing cert and CA)"
+help_chain="desired location of a chain pem (containing CA)"
+help_cert="desired location of a certificate pem"
+help_key="desired location of a private key pem"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs acme san group
+
+snap install --classic certbot
+ln -s /snap/bin/certbot /usr/bin/certbot
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+
+certbot certonly --standalone --server $acme --register-unsafely-without-email --cert-name ${san} -d ${san}
+chmod g+rx /etc/letsencrypt/archive
+chmod g+rx /etc/letsencrypt/archive/${san}
+chmod g+rx /etc/letsencrypt/live
+chmod g+rx /etc/letsencrypt/live/${san}
+if [[ -n "${fullchain:-}" ]]
+then
+  mkdir -p $(dirname $fullchain)
+  rm -rf $fullchain
+  ln -s /etc/letsencrypt/live/${san}/fullchain.pem $fullchain
+  chmod 640 $fullchain
+fi
+if [[ -n "${chain:-}" ]]
+then
+  mkdir -p $(dirname $chain)
+  rm -rf $chain
+  ln -s /etc/letsencrypt/live/${san}/chain.pem $chain
+  chmod 640 $chain
+fi
+if [[ -n "${cert:-}" ]]
+then
+  mkdir -p $(dirname $cert)
+  rm -rf $cert
+  ln -s /etc/letsencrypt/live/${san}/cert.pem $cert
+  chmod 640 $cert
+fi
+if [[ -n "${key:-}" ]]
+then
+  mkdir -p $(dirname $key)
+  rm -rf $key
+  ln -s /etc/letsencrypt/live/${san}/privkey.pem $key
+  chmod 640 $key
+fi
+chgrp -R $group /etc/letsencrypt
+chgrp -R $group /etc/letsencrypt/archive/${san}/

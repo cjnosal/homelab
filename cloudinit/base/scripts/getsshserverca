@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(vault domain)
+
+help_this="fetch ssh server ca certificate and configure trusted domain"
+help_vault="vault server url"
+help_domain="trust the CA for servers under this domain"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs vault domain
+
+PEM=$(curl -fSsL ${vault}/v1/ssh-host-signer/public_key)
+echo "@cert-authority *.${domain} $PEM" > /etc/ssh/ssh_known_hosts
+chmod a+r /etc/ssh/ssh_known_hosts

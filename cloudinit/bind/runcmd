@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+pushd ${SCRIPT_DIR}
+
 # args
 OPTIONS=(forwarders network zone reverse_zone)
 
@@ -14,11 +18,7 @@ export hostname=$(hostname)
 export ip=$(hostname -I | sed -e 's/ $//')
 export ptr=$(cut -d'.' -f 4 <<< $ip)
 
-cd init
-
-cp argshelper /usr/local/include
-
-cd bind
+../base/runcmd
 
 source /usr/local/include/argshelper
 parseargs $@
@@ -80,4 +80,5 @@ systemctl is-active named --wait
 [[ "$(dig @${ip} -4 -tA ${hostname}.${zone}. +noall +answer | awk '{print $5}')" == "${ip}" ]]
 [[ "$(dig @${ip} -4 -tPTR ${ptr}.${reverse_zone}. +noall +answer | awk '{print $5}')" == "${hostname}.${zone}." ]]
 
+popd
 echo success
