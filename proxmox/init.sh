@@ -35,7 +35,11 @@ EOF
 
 ssh ubuntu@bind.home.arpa addhost.sh pve 192.168.2.200
 
-./workspace/proxmox/preparevm --vmname step
+./workspace/proxmox/preparevm --vmname step --userdata ""
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/step ubuntu@step.home.arpa:/home/ubuntu/init
+ssh ubuntu@step.home.arpa sudo bash << EOF
+/home/ubuntu/init/step/runcmd --network "192.168.2.0/23" --domain "home.arpa"
+EOF
 
 ssh ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.pem
 ssh ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.pem

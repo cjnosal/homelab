@@ -31,7 +31,7 @@ then
   ./workspace/cloudinit/${userdata}/generate.sh $ip
   ./workspace/proxmox/newvm --vmname ${vmname} --userdata ${userdata}.yml ${PASSTHROUGH[@]}
 else
-  ./workspace/proxmox/newvm --vmname ${vmname} ${PASSTHROUGH[@]}
+  ./workspace/proxmox/newvm --vmname ${vmname} --ip $ip ${PASSTHROUGH[@]}
 fi
 
 if [[ "${skip_domain:-}" != "1" ]]

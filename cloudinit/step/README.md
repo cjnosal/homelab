@@ -6,9 +6,11 @@ Update cloudinit templates to trust the root and intermediate certs
 nameserver bind.home.arpa
 
 ```
-export IP=$(./workspace/proxmox/ips next)
-./workspace/cloudinit/step/generate.sh $IP
-./workspace/proxmox/newvm --vmname step --userdata step.yml --ip $IP
+./workspace/proxmox/preparevm --vmname step --userdata ""
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/step ubuntu@step.home.arpa:/home/ubuntu/init
+ssh ubuntu@step.home.arpa sudo bash << EOF
+/home/ubuntu/init/step/runcmd --network "192.168.2.0/23" --domain "home.arpa"
+EOF
 ```
 
 ## add DNS record
