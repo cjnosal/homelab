@@ -2,13 +2,14 @@
 
 Create an open LDAP server
 
-## add DNS record
-export IP=$(./workspace/proxmox/ips next)
-see cloudinit/bind/README.md (done first because cloudinit includes certbot setup)
-
 ```
-./workspace/cloudinit/ldap/generate.sh $IP
-./workspace/proxmox/newvm --vmname ldap --userdata ldap.yml --ip $IP
+./workspace/proxmox/preparevm --vmname ldap --userdata ""
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap ./workspace/cloudinit/user.yml ubuntu@ldap.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@ldap.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@ldap.home.arpa sudo bash << EOF
+/home/ubuntu/init/ldap/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --userfile /home/ubuntu/init/user.yml
+EOF
 ```
 
 ## change the placeholder admin password!

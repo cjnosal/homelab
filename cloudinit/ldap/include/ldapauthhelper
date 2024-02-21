@@ -1,10 +1,10 @@
-ZONE="home.arpa"
+source /usr/local/include/ldap.env
 AUTH_ARGS="-x"
 if [[ -z "${LDAP_BIND_DN:-}" ]]
 then
   echo "bind uid:"
   read BIND_USER_UID
-  LDAP_BIND_DN=$(ldapsearch -H ldaps://ldap.${ZONE} -x "(uid=${BIND_USER_UID})" dn | grep dn: | awk '{print $2}')
+  LDAP_BIND_DN=$(ldapsearch -H ldaps://${HOST} -x "(uid=${BIND_USER_UID})" dn | grep dn: | awk '{print $2}')
 fi
 AUTH_ARGS="$AUTH_ARGS -D $LDAP_BIND_DN"
 if [[ -z "${LDAP_BIND_PW:-}" ]]

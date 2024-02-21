@@ -6,6 +6,12 @@ SUFFIX='dc=home,dc=arpa'
 
 USERNAME=$1
 
+cat > /usr/local/include/ldap.env << EOF
+   SUFFIX=${SUFFIX}
+   HOST=ldap.${ZONE}
+   DOMAIN=${ZONE}
+EOF
+
 debconf-set-selections <<EOF
 nslcd nslcd/ldap-reqcert string demand
 nslcd nslcd/ldap-uris string ldaps://ldap.${ZONE}/

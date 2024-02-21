@@ -1,0 +1,11 @@
+dn: ou=People,${suffix}
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,${suffix}
+objectClass: organizationalUnit
+ou: Groups
+
+dn: ou=Systems,${suffix}
+objectClass: organizationalUnit
+ou: Systems

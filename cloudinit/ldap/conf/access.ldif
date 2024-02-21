@@ -1,0 +1,9 @@
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {0}to dn.subtree="${suffix}" attrs=userPassword by group.exact="cn=ldap-admin,ou=groups,${suffix}" =w by * break
+
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+add: olcAccess
+olcAccess: {3}to dn.subtree="${suffix}" by group.exact="cn=ldap-admin,ou=groups,${suffix}" manage by * break

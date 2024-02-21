@@ -1,66 +1,109 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLACEHOLDER_ADMIN_CRED=$1
-PLACEHOLDER_USER_CRED=$2
-USERNAME=$3
-USER_GIVEN_NAME=$4
-USER_SURNAME=$5
-USER_EMAIL=$6
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-ZONE=home.arpa
-SUFFIX='dc=home,dc=arpa'
+pushd ${SCRIPT_DIR}
+
+# args
+OPTIONS=(domain acme userfile)
+
+help_this="initialize ldap server"
+help_domain="parent domain of this environment"
+help_acme="acme directory url to acquire TLS cert"
+help_userfile="path of user.yml defining profile for first admin"
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs userfile domain acme
+
+export hostname=$(hostname | cut -d'.' -f1)
+
+# ldap dc components from $domain
+export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
+
+# conf
+
+mkdir -p /etc/ldap
+mkdir -p /etc/sssd
+
+sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$hostname/g" -e "s/\${suffix}/$suffix/g" conf/ldap.conf > /etc/ldap/ldap.conf
+sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$hostname/g" -e "s/\${suffix}/$suffix/g" conf/sssd.conf > /etc/sssd/sssd.conf
+cp conf/slapd /etc/default/slapd
+
+sed -e "s/\${suffix}/$suffix/g" conf/org.ldif > /etc/ldap/org.ldif
+sed -e "s/\${suffix}/$suffix/g" conf/access.ldif > /etc/ldap/access.ldif
+
+cp include/* /usr/local/include/
+cp scripts/* /usr/local/bin/
+
+cat > /usr/local/include/ldap.env << EOF
+   SUFFIX=${suffix}
+   HOST=${hostname}.${domain}
+   DOMAIN=${domain}
+EOF
+
+# creds
+if [[ ! -f /root/ldap_admin.passwd ]]
+then
+  admincred=$(openssl rand -base64 32)
+  echo $admincred > /root/ldap_admin.passwd
+  chmod 400 /root/ldap_admin.passwd
+else
+  admincred=$(cat /root/ldap_admin.passwd)
+fi
+
+if [[ ! -f /root/user.passwd ]]
+then
+  password=$(openssl rand -base64 32)
+  echo $admincred > /root/user.passwd
+  chmod 400 /root/user.passwd
+else
+  password=$(cat /root/user.passwd)
+fi
+
+# packages
 
 debconf-set-selections <<EOF
-  slapd slapd/internal/generated_adminpw password $PLACEHOLDER_ADMIN_CRED
-  slapd slapd/password2 password $PLACEHOLDER_ADMIN_CRED
-  slapd slapd/internal/adminpw password $PLACEHOLDER_ADMIN_CRED
-  slapd slapd/password1 password $PLACEHOLDER_ADMIN_CRED
-  slapd slapd/domain string ${ZONE}
+  slapd slapd/internal/generated_adminpw password ${admincred}
+  slapd slapd/password2 password ${admincred}
+  slapd slapd/internal/adminpw password ${admincred}
+  slapd slapd/password1 password ${admincred}
+  slapd slapd/domain string ${domain}
   slapd shared/organization string homelab
 EOF
 
-apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes slapd
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes slapd sssd-ldap ldap-utils ldb-tools sssd-tools
 
-export CERT_GROUP=openldap
-export CHAIN_PATH=/etc/ldap/ca.pem
-export PRIVKEY_PATH=/etc/ldap/key.pem
-export CERT_PATH=/etc/ldap/cert.pem
-initcertbot ldap.${ZONE}
+wget --progress=dot:giga https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+chmod +x /usr/local/bin/yq
 
-ldapmodify -Y EXTERNAL -H ldapi:/// -f /run/certinfo.ldif
+# setup
+initcertbot --acme $acme --group openldap --san ${hostname}.${domain} --chain /etc/ldap/ca.pem --key /etc/ldap/key.pem --cert /etc/ldap/cert.pem
 
-#! admins can reset passwords
-ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
-dn: olcDatabase={1}mdb,cn=config
-changetype: modify
-add: olcAccess
-olcAccess: {0}to dn.subtree="${SUFFIX}" attrs=userPassword by group.exact="cn=ldap-admin,ou=groups,${SUFFIX}" =w by * break
-EOF
+ldapmodify -Q -Y EXTERNAL -H ldapi:/// -f conf/certinfo.ldif
+ldapmodify -Q -Y EXTERNAL -H ldapi:/// -f /etc/ldap/access.ldif
 
-#! admins can manage org
-ldapmodify -Q -Y EXTERNAL -H ldapi:/// << EOF
-dn: olcDatabase={1}mdb,cn=config
-changetype: modify
-add: olcAccess
-olcAccess: {3}to dn.subtree="${SUFFIX}" by group.exact="cn=ldap-admin,ou=groups,${SUFFIX}" manage by * break
-EOF
-
-hostnamectl set-hostname ldap.${ZONE}
+hostnamectl set-hostname ${hostname}.${domain}
 
 systemctl restart sssd.service
 systemctl restart slapd
 
 
-export LDAP_BIND_DN="cn=admin,${SUFFIX}"
-export LDAP_BIND_PW="$PLACEHOLDER_ADMIN_CRED"
+export LDAP_BIND_DN="cn=admin,${suffix}"
+export LDAP_BIND_PW="${admincred}"
 
-ldapadd -H ldapi:/// -f /run/org.ldif -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW"
+# default org units
+ldapadd -H ldapi:/// -f /etc/ldap/org.ldif -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW"
 
-ldapadd -H ldapi:/// -f /run/load_memberof.ldif -Q -Y EXTERNAL
-ldapmodify -H ldapi:/// -f /run/load_refint.ldif -Q -Y EXTERNAL
-ldapadd -H ldapi:/// -f /run/configure_refint.ldif -Q -Y EXTERNAL
+# configure memberof module
+ldapadd -H ldapi:/// -f conf/load_memberof.ldif -Q -Y EXTERNAL
+ldapmodify -H ldapi:/// -f conf/load_refint.ldif -Q -Y EXTERNAL
+ldapadd -H ldapi:/// -f conf/configure_refint.ldif -Q -Y EXTERNAL
 
+# default groups
 addldapgroup keycloak-realm-admin
 addldapgroup step-admin
 addldapgroup step-provisioner-admin
@@ -73,7 +116,13 @@ addldapgroup k8s-core-admin
 addldapgroup k8s-run-admin
 
 # initial admin
-addldapuser $USERNAME $USER_GIVEN_NAME $USER_SURNAME $USER_EMAIL
+
+username=$(yq .username $userfile)
+givenname=$(yq .givenname $userfile)
+surname=$(yq .surname $userfile)
+email=$(yq .email $userfile)
+
+addldapuser $username $givenname $surname $email
 
 # mail
 # postmaster/abuse mailbox
@@ -83,15 +132,20 @@ addldapuser catchall Catch All catchall@home.arpa
 # service account
 addldapuser mailbot Mail Bot mailbot@home.arpa
 
-addldapusertogroup $USERNAME keycloak-realm-admin
-addldapusertogroup $USERNAME step-admin
-addldapusertogroup $USERNAME step-provisioner-admin
-addldapusertogroup $USERNAME vault-user
-addldapusertogroup $USERNAME vault-admin
-addldapusertogroup $USERNAME ssh-ops
-addldapusertogroup $USERNAME dns-ops
-addldapusertogroup $USERNAME ldap-admin
-addldapusertogroup $USERNAME k8s-core-admin
-addldapusertogroup $USERNAME k8s-run-admin
+# first user is admin of all components
+addldapusertogroup $username keycloak-realm-admin
+addldapusertogroup $username step-admin
+addldapusertogroup $username step-provisioner-admin
+addldapusertogroup $username vault-user
+addldapusertogroup $username vault-admin
+addldapusertogroup $username ssh-ops
+addldapusertogroup $username dns-ops
+addldapusertogroup $username ldap-admin
+addldapusertogroup $username k8s-core-admin
+addldapusertogroup $username k8s-run-admin
 
-ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $PLACEHOLDER_USER_CRED -S uid=${USERNAME},ou=people,${SUFFIX}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $password -S uid=${username},ou=people,${suffix}
+
+popd
+
+echo success

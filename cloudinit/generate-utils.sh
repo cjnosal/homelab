@@ -13,13 +13,13 @@ function write_snippet {
 	WORKSPACE=/root/workspace
 	
 	CA_ARGS=""
-	if [[ -f ${WORKSPACE}/creds/step_root_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/step_root_ca.crt ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${WORKSPACE}/creds/step_root_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_root_ca=${WORKSPACE}/creds/step_root_ca.crt"
 	fi
-	if [[ -f ${WORKSPACE}/creds/step_intermediate_ca.pem ]]
+	if [[ -f ${WORKSPACE}/creds/step_intermediate_ca.crt ]]
 	then
-		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${WORKSPACE}/creds/step_intermediate_ca.pem"
+		CA_ARGS="$CA_ARGS --data-value-file step_intermediate_ca=${WORKSPACE}/creds/step_intermediate_ca.crt"
 	fi
 
 	VAULT_ARGS=""

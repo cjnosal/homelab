@@ -18,8 +18,8 @@ see cloudinit/bind/README.md
 
 ## grab ca for future vms
 ```
-ssh -i .ssh/vm ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.pem
-ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.pem
+ssh -i .ssh/vm ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.crt
+ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.crt
 ```
 
 ## trust CA in existing vm
@@ -31,8 +31,8 @@ sudo update-ca-certificates
 ```
 or
 ```
-scp workspace/creds/step_root_ca.pem ubuntu@bind.home.arpa:/tmp/steproot.crt
-scp workspace/creds/step_intermediate_ca.pem ubuntu@bind.home.arpa:/tmp/step_intermediate.crt
+scp workspace/creds/step_root_ca.crt ubuntu@bind.home.arpa:/tmp/steproot.crt
+scp workspace/creds/step_intermediate_ca.crt ubuntu@bind.home.arpa:/tmp/step_intermediate.crt
 ssh ubuntu@bind.home.arpa << EOF
 sudo cp /tmp/steproot.crt /usr/local/share/ca-certificates/steproot.crt
 sudo cp /tmp/step_intermediate.crt /usr/local/share/ca-certificates/step_intermediate.crt

@@ -41,10 +41,16 @@ ssh ubuntu@step.home.arpa sudo bash << EOF
 /home/ubuntu/init/step/runcmd --network "192.168.2.0/23" --domain "home.arpa"
 EOF
 
-ssh ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.pem
-ssh ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.pem
+ssh ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.crt
+ssh ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.crt
 
-./workspace/proxmox/preparevm --vmname ldap
+./workspace/proxmox/preparevm --vmname ldap --userdata ""
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap ./workspace/cloudinit/user.yml ubuntu@ldap.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@ldap.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@ldap.home.arpa sudo bash << EOF
+/home/ubuntu/init/ldap/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --userfile /home/ubuntu/init/user.yml
+EOF
 
 ./workspace/proxmox/preparevm --vmname keycloak
 

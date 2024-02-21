@@ -16,12 +16,19 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs acme san group
 
-snap install --classic certbot
-ln -s /snap/bin/certbot /usr/bin/certbot
-export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+if [[ ! -f /usr/bin/certbot ]]
+then
+  snap install --classic certbot
+  ln -s /snap/bin/certbot /usr/bin/certbot
+fi
 
-certbot certonly --standalone --server $acme --register-unsafely-without-email --cert-name ${san} -d ${san}
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+if ! grep -q REQUESTS_CA_BUNDLE /etc/environment
+then
+  echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+fi
+
+certbot certonly --standalone --server $acme --register-unsafely-without-email --cert-name ${san} -d ${san} || certbot renew
 chmod g+rx /etc/letsencrypt/archive
 chmod g+rx /etc/letsencrypt/archive/${san}
 chmod g+rx /etc/letsencrypt/live

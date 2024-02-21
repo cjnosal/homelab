@@ -20,4 +20,7 @@ cp conf/sshd_ca.conf /etc/ssh/sshd_config.d/
 # scripts
 cp scripts/* /usr/local/bin/
 
+# trust init/certs/
+gettlsca
+
 popd
