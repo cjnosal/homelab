@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd /opt/keycloak/bin
+
+OPTIONS=(username password authrealm realm)
+
+help_this="create a realm with ldap federation"
+
+help_username="keycloak admin"
+help_password="keycloak admin's password"
+help_authrealm="realm the keycloak admin belongs to"
+help_realm="realm to create"
+
+authrealm=${authrealm:-master}
+realm=${realm:-infrastructure}
+
+source /usr/local/include/argshelper
+source /usr/local/include/keycloak.env
+
+parseargs $@
+requireargs authrealm realm
+
+if [[ -z "$username" ]]
+then
+  echo keycloak username:
+  read username
+fi
+
+if [[ -z "$password" ]]
+then
+  echo password:
+  read -s password
+fi
+
+./kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
+./kcadm.sh create realms -s enabled=true -s realm=${realm} \
+  -s verifyEmail=true \
+  -s 'smtpServer.host=mail.home.arpa' \
+  -s 'smtpServer.starttls=true' \
+  -s 'smtpServer.auth=false' \
+  -s 'smtpServer.fromDisplayName=Keycloak' \
+  -s "smtpServer.from=keycloak@${DOMAIN}" \
+  -s 'smtpServer.replyToDisplayName=no-reply' \
+  -s "smtpServer.replyTo=no-reply@${DOMAIN}" \
+  -s "smtpServer.envelopeFrom=keycloak@${DOMAIN}"
+
+REALM_ID=$(./kcadm.sh get realms/${realm} --fields id | jq -r .id)
+LDAP_ID=$(./kcadm.sh create components -r ${realm} \
+    -s name="ldap" \
+    -s parentId=$REALM_ID \
+    -s providerId=ldap \
+    -s providerType=org.keycloak.storage.UserStorageProvider \
+    -s 'config.editMode=["READ_ONLY"]' \
+    -s 'config.usernameLDAPAttribute=["uid"]' \
+    -s 'config.uuidLDAPAttribute=["entryUUID"]' \
+    -s 'config.userObjectClasses=["inetOrgPerson"]' \
+    -s "config.connectionUrl=[\"${LDAP_HOST}\"]" \
+    -s "config.usersDn=[\"ou=People,${SUFFIX}\"]" \
+    -s 'config.enabled=["true"]' \
+    -s 'config.authType=["none"]' \
+    -i)
+
+./kcadm.sh create components -r ${realm} \
+    -s name="group-ldap-mapper" \
+    -s parentId=$LDAP_ID \
+    -s providerId=group-ldap-mapper \
+    -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+    -s "config.\"groups.dn\"=[ \"ou=Groups,${SUFFIX}\" ]" \
+    -s 'config.mode=[ "READ_ONLY" ]' \
+    -s 'config."user.roles.retrieve.strategy"=[ "LOAD_GROUPS_BY_MEMBER_ATTRIBUTE" ]' \
+    -s 'config."membership.ldap.attribute"=[ "member" ]' \
+    -s 'config."group.object.classes"=[ "groupOfNames" ]' \
+    -i
+
+./kcadm.sh create client-scopes -r ${realm} \
+    -s name="groups" \
+    -s protocol="openid-connect" \
+    -s 'attributes."include.in.token.scope"=true' \
+    -s 'attributes."display.on.consent.screen"=true'

@@ -14,6 +14,7 @@ authrealm=${authrealm:-infrastructure}
 realm=${realm:-infrastructure}
 
 source /usr/local/include/argshelper
+source /usr/local/include/keycloak.env
 
 if [[ -d /opt/keycloak/bin ]]
 then
@@ -35,7 +36,7 @@ then
   read -s password
 fi
 
-kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm $authrealm --user $username --password $password
+kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
 
 LDAP_ID=$(kcadm.sh get components -q name=ldap -r $realm | jq -r '.[0].id')
 kcadm.sh create user-storage/${LDAP_ID}/sync?action=triggerFullSync -r $realm

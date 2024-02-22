@@ -1,51 +1,114 @@
 #!/usr/bin/env bash
 set -euo pipefail
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-PLACEHOLDER_ADMIN_CRED=$1
-export ZONE=home.arpa
+pushd ${SCRIPT_DIR}
 
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
+# args
+OPTIONS=(domain acme ldap)
 
-DB_CRED=$(generatecred)
+help_this="initialize keycloak oidc server"
+help_domain="parent domain of this environment"
+help_acme="acme directory url to acquire TLS cert"
+help_ldap="url of LDAP host"
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs domain acme ldap
+
+export hostname=$(hostname | cut -d'.' -f1)
+
+# ldap dc components from $domain
+export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
+
+# creds
+if [[ ! -f /root/keycloak_admin.passwd ]]
+then
+  admincred=$(openssl rand -base64 32)
+  echo $admincred > /root/keycloak_admin.passwd
+  chmod 400 /root/keycloak_admin.passwd
+else
+  admincred=$(cat /root/keycloak_admin.passwd)
+fi
+
+if [[ ! -f /root/db.passwd ]]
+then
+  dbcred=$(openssl rand -base64 32)
+  echo $dbcred > /root/db.passwd
+  chmod 400 /root/db.passwd
+else
+  dbcred=$(cat /root/db.passwd)
+fi
+
+# packages
+apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes \
+  openjdk-19-jre-headless postgresql postgresql-client postgresql-contrib
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 tar -xf keycloak-22.0.0.tar.gz
-addgroup keycloak
-adduser --system keycloak
-adduser keycloak keycloak
-mv keycloak-22.0.0 /opt/keycloak
+mkdir -p /opt/keycloak
+cp -r keycloak-22.0.0/* /opt/keycloak/
 rm keycloak-22.0.0.tar.gz
-sed "s/db-password=/db-password=${DB_CRED}/" /run/keycloak.conf > /opt/keycloak/conf/keycloak.conf
-chown -R keycloak /opt/keycloak
+rm -rf keycloak-22.0.0
+
 wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify-deployment/1.0.1/quarkus-systemd-notify-deployment-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-deployment-1.0.1.jar
 wget --progress=dot:giga https://repo1.maven.org/maven2/io/quarkiverse/systemd/notify/quarkus-systemd-notify/1.0.1/quarkus-systemd-notify-1.0.1.jar -O /opt/keycloak/providers/quarkus-systemd-notify-1.0.1.jar
+chmod -R 755 /opt/keycloak/providers/*
+
+# conf
+mkdir -p /opt/keycloak/conf
+
+sed -e "s/\${admincred}/${admincred}/g" conf/keycloak.service > /etc/systemd/system/keycloak.service
+chmod 600 /etc/systemd/system/keycloak.service
+
+sed -e "s/\${dbcred}/${dbcred}/" -e "s/\${hostname}/${hostname}/" -e "s/\${domain}/${domain}/" conf/keycloak.conf > /opt/keycloak/conf/keycloak.conf
+
+cat > /usr/local/include/keycloak.env << EOF
+   SUFFIX=${suffix}
+   HOST=https://${hostname}.${domain}:8443
+   DOMAIN=${domain}
+   LDAP_HOST=${ldap}
+EOF
+
+cp scripts/* /usr/local/bin/
+
+# setup
+if ! id -u keycloak
+then
+	adduser --system keycloak
+  addgroup keycloak
+  adduser keycloak keycloak
+fi
+chown -R keycloak /opt/keycloak
+
 systemctl start postgresql.service
-sudo -u postgres createuser keycloak
-sudo -u postgres createdb keycloak
-sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$DB_CRED';"
+if ! sudo -u postgres psql -c "SELECT usename from pg_catalog.pg_user;" | grep -q keycloak
+then
+	sudo -u postgres createuser keycloak
+	sudo -u postgres createdb keycloak
+	sudo -u postgres psql -c "ALTER USER keycloak PASSWORD '$dbcred';"
+fi
 /opt/keycloak/bin/kc.sh build --db=postgres
 
-export CERT_GROUP=keycloak
-export FULLCHAIN_PATH=/opt/keycloak/conf/server.crt.pem
-export PRIVKEY_PATH=/opt/keycloak/conf/server.key.pem
-initcertbot keycloak.${ZONE}
+initcertbot --acme $acme --group keycloak --san ${hostname}.${domain} \
+  --fullchain /opt/keycloak/conf/server.crt.pem --key /opt/keycloak/conf/server.key.pem
+
 
 systemctl enable keycloak
 systemctl start keycloak
 systemctl is-active keycloak --wait
 
-while ! curl -fSsL  https://keycloak.home.arpa:8443/health
+while ! curl -fSsL  https://${hostname}.${domain}:8443/health
 do
 	echo waiting for keycloak
 	sleep 2
 done
 
-create-realm --username admin --password ${PLACEHOLDER_ADMIN_CRED} --authrealm master --realm infrastructure
+create-realm --username admin --password ${admincred} --authrealm master --realm infrastructure
 
-sync-realm --username admin --password ${PLACEHOLDER_ADMIN_CRED} --authrealm master --realm infrastructure
+sync-realm --username admin --password ${admincred} --authrealm master --realm infrastructure
 
 while ! /opt/keycloak/bin/kcadm.sh get groups -r infrastructure | grep keycloak-realm-admin
 do
@@ -56,3 +119,7 @@ done
 # group by name only returns first two results
 GROUP_ID=$(/opt/keycloak/bin/kcadm.sh get groups -r infrastructure -q search=keycloak-realm-admin | jq -r .[0].id)
 /opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gid $GROUP_ID --cclientid realm-management --rolename realm-admin
+
+popd
+
+echo success

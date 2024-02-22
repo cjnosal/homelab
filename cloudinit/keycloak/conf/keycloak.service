@@ -1,0 +1,15 @@
+[Unit]
+Description=Keycloak Server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+Environment=KEYCLOAK_ADMIN=admin
+Environment=KEYCLOAK_ADMIN_PASSWORD=${admincred}
+ExecStart=/opt/keycloak/bin/kc.sh start --optimized --log=console,file --log-file=/var/log/keycloak/keycloak.log
+SuccessExitStatus=0 143
+
+[Install]
+WantedBy=multi-user.target

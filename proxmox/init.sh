@@ -52,7 +52,13 @@ ssh ubuntu@ldap.home.arpa sudo bash << EOF
   --userfile /home/ubuntu/init/user.yml
 EOF
 
-./workspace/proxmox/preparevm --vmname keycloak
+./workspace/proxmox/preparevm --vmname keycloak --userdata ""
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/keycloak ubuntu@keycloak.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@keycloak.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@keycloak.home.arpa sudo bash << EOF
+/home/ubuntu/init/keycloak/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --ldap ldaps://ldap.home.arpa
+EOF
 
 ./workspace/proxmox/preparevm --vmname vault
 
