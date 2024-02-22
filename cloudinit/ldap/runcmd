@@ -58,7 +58,7 @@ fi
 if [[ ! -f /root/user.passwd ]]
 then
   password=$(openssl rand -base64 32)
-  echo $admincred > /root/user.passwd
+  echo $password > /root/user.passwd
   chmod 400 /root/user.passwd
 else
   password=$(cat /root/user.passwd)
