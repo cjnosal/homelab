@@ -16,7 +16,7 @@ help_subdomain="DNS subdomain for nginx ingress"
 help_supervisor="install pinniped supervisor in this cluster"
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
-source ${SCRIPT_DIR}/../argshelper
+source ${SCRIPT_DIR}/../base/include/argshelper
 
 parseargs $@
 requireargs cluster lb_addresses workers subdomain
