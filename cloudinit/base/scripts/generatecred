@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(length)
+
+help_this="generate an alphanumeric password"
+help_length="number of characters (default 32)"
+
+source /usr/local/include/argshelper
+parseargs $@
+
+length=${length:-32}
+
+(tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c $length
+
+# write newline to stderr in interactive shell
+if [ -t 1 ]
+then
+  >&2 echo
+fi

@@ -11,7 +11,7 @@ help_insecure="skip verification of the host's TLS certificate for bootstrapping
 source /usr/local/include/argshelper
 parseargs $@
 
-if [[ -d /home/ubuntu/init/certs/ ]]
+if [[ -n $(ls /home/ubuntu/init/certs/) ]]
 then
     sudo cp /home/ubuntu/init/certs/* /usr/local/share/ca-certificates/
 

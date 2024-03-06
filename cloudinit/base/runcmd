@@ -17,6 +17,10 @@ id -u ops || adduser --home /home/ops --shell /bin/bash --disabled-password --ge
 cp conf/sudoers /etc/sudoers.d/91-ops
 cp conf/sshd_ca.conf /etc/ssh/sshd_config.d/
 
+mkdir -p /home/ubuntu/init/creds/
+mkdir -p /home/ubuntu/init/certs/
+chown -R ubuntu /home/ubuntu/init
+
 # scripts
 cp scripts/* /usr/local/bin/
 
