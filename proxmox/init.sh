@@ -87,6 +87,7 @@ do
 done
 
 # backfill step ca
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@bind.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@bind.home.arpa sudo gettlsca
 
 # backfill ssh ca
