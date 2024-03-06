@@ -48,7 +48,7 @@ EOF
 # creds
 if [[ ! -f /root/ldap_admin.passwd ]]
 then
-  admincred=$(openssl rand -base64 32)
+  admincred=$(generatecred)
   echo $admincred > /root/ldap_admin.passwd
   chmod 400 /root/ldap_admin.passwd
 else
@@ -57,7 +57,7 @@ fi
 
 if [[ ! -f /root/user.passwd ]]
 then
-  password=$(openssl rand -base64 32)
+  password=$(generatecred)
   echo $password > /root/user.passwd
   chmod 400 /root/user.passwd
 else

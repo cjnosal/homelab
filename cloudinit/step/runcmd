@@ -35,7 +35,7 @@ mkdir -p /etc/step-ca
 
 if [[ ! -f /etc/step-ca/password.txt ]]
 then
-  PLACEHOLDER_CRED=$(openssl rand -base64 32)
+  PLACEHOLDER_CRED=$(generatecred)
   echo $PLACEHOLDER_CRED > /etc/step-ca/password.txt
   chmod 400 /etc/step-ca/password.txt
 fi

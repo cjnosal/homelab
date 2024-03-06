@@ -259,10 +259,7 @@ echo "$NEW_VAULT_CREDS" > ./workspace/creds/vault_creds.json
 ## rotate ldap admin password
 NEW_LDAP_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.home.arpa bash << EOF
 set -euo pipefail
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ \$(kill -L \$?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
+
 NEW_LDAP_PASSWORD=\$(generatecred)
 HASH=\$(slappasswd -s \$NEW_LDAP_PASSWORD)
 sudo ldapmodify -Q -Y EXTERNAL -H ldapi:/// >&2 << E0C
@@ -285,10 +282,7 @@ echo "$NEW_LDAP_PASSWORD" > ./workspace/creds/ldap_admin.passwd
 ## rotate keycloak admin password
 NEW_KEYCLOAK_PASSWORD=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF
 set -euo pipefail
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ \$(kill -L \$?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
+
 NEW_KEYCLOAK_PASSWORD=\$(generatecred)
 
 PLACEHOLDER_CRED=\$(sudo grep PASSWORD /etc/systemd/system/keycloak.service | cut -d'=' -f3)

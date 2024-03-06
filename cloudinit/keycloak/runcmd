@@ -26,7 +26,7 @@ export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e
 # creds
 if [[ ! -f /root/keycloak_admin.passwd ]]
 then
-  admincred=$(openssl rand -base64 32)
+  admincred=$(generatecred)
   echo $admincred > /root/keycloak_admin.passwd
   chmod 400 /root/keycloak_admin.passwd
 else
@@ -35,7 +35,7 @@ fi
 
 if [[ ! -f /root/db.passwd ]]
 then
-  dbcred=$(openssl rand -base64 32)
+  dbcred=$(generatecred)
   echo $dbcred > /root/db.passwd
   chmod 400 /root/db.passwd
 else
