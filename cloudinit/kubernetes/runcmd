@@ -3,15 +3,17 @@ set -euo pipefail
 
 node=$1 # master/worker
 
+K8S_VER=v1.28
+
 swapoff -a
 
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
   gpg jq apt-transport-https ca-certificates curl
 
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${K8S_VER}/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
 chmod 600 /etc/apt/sources.list.d/kubernetes.list
 
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/${K8S_VER}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 apt-get update
 
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
