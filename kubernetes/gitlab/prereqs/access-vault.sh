@@ -8,7 +8,7 @@ export VAULT_ADDR=https://vault.home.arpa:8200
 vault login -no-print -method=oidc role=vault-admin
 
 # service account can read gitlab's ldap password
-enable-k8s-auth.sh --cluster core
+enable-k8s-auth.sh --cluster core --url https://k8s-core-master.home.arpa:6443
 
 add-k8s-service-account.sh --cluster core --namespace gitlab --service_account gitlab-auth-config --policy -<<EOF
 path "infrastructure/ldap/gitlab" {
