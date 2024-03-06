@@ -82,6 +82,7 @@ chmod -R a+r /usr/share/caddy
 
 systemctl restart caddy
 systemctl is-active caddy --wait
+while ! curl -SsL https://${hostname}.${domain}:8443/; do echo waiting for caddy tls; sleep 2; done
 
 # smoke test
 curl -fSsL https://${hostname}.${domain}:8443/step_root_ca.crt
