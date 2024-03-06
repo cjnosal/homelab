@@ -11,6 +11,7 @@ help_namespace="namespace of the service account"
 help_policy="file path of a vault policy determining what secrets the service account can access (- for stdin)"
 
 source /usr/local/include/argshelper
+source /usr/local/include/vault.env
 
 parseargs $@
 requireargs cluster service_account namespace policy

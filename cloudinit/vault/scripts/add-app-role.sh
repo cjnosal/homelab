@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OPTIONS=(app policy owner)
+OPTIONS=(app policy owner subnet)
 
 help_this="add a vault policy for a specified approle"
 
 help_app="name of the app"
 help_policy="file path of a vault policy determining what secrets the app can access (- for stdin)"
 help_owner="name of existing ldap group that can access the role-id and secret-id to provision the app"
+help_subnet="CIDR range allowed to use this approle"
 
 source /usr/local/include/argshelper
+source /usr/local/include/vault.env
 
 parseargs $@
-requireargs app policy owner
+requireargs app policy owner subnet
 
 policy_name=app-${app}-policy
 
@@ -22,8 +24,8 @@ vault write auth/approle/role/${app}-role \
   token_ttl=20m \
   token_max_ttl=30m \
   secret_id_num_uses=1 \
-  secret_id_bound_cidrs=192.168.2.0/23 \
-  token_bound_cidrs=192.168.2.0/23 \
+  secret_id_bound_cidrs=${subnet} \
+  token_bound_cidrs=${subnet} \
   bind_secret_id=false \
   token_policies=${policy_name}
 

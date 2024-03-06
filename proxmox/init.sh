@@ -16,8 +16,6 @@ generatecred > ./workspace/creds/ldap_admin.passwd
 generatecred > ./workspace/creds/keycloak_admin.passwd
 generatecred > ./workspace/creds/user.passwd
 
-KEYCLOAK_ADMIN_PASSWD=$(cat ./workspace/creds/keycloak_admin.passwd)
-
 eval $(ssh-agent)
 ssh-add ~/.ssh/vm
 
@@ -59,8 +57,27 @@ ssh ubuntu@keycloak.home.arpa sudo bash << EOF
 /home/ubuntu/init/keycloak/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
   --ldap ldaps://ldap.home.arpa
 EOF
+KEYCLOAK_ADMIN_PASSWD=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa sudo cat /root/keycloak_admin.passwd)
+
+# vault oidc login
+ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash > ./workspace/creds/vault-client-secret << EOF
+set -euo pipefail
+cd /opt/keycloak/bin
+
+/usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=vault \
+  -s 'redirectUris=["http://localhost:8250/oidc/callback","https://vault.home.arpa:8250/oidc/callback","https://vault.home.arpa:8200/ui/vault/auth/oidc/oidc/callback"]'
+EOF
 
 ./workspace/proxmox/preparevm --vmname vault
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/vault ubuntu@vault.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@vault.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@vault.home.arpa mkdir /home/ubuntu/init/creds/
+scp -r ./workspace/creds/vault-client-secret ubuntu@vault.home.arpa:/home/ubuntu/init/creds/
+ssh ubuntu@vault.home.arpa sudo bash << EOF
+/home/ubuntu/init/vault/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --ldap ldaps://ldap.home.arpa --oidc https://keycloak.home.arpa:8443/realms/infrastructure \
+  --clientsecret /home/ubuntu/init/creds/vault-client-secret --subnet 192.168.2.0/23,127.0.0.0/8
+EOF
 
 curl -kfSsL -o /root/workspace/creds/vault_host_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-host-signer/public_key
 curl -kfSsL -o /root/workspace/creds/vault_client_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
@@ -75,7 +92,7 @@ done
 ssh ubuntu@bind.home.arpa sudo gettlsca
 
 # backfill ssh ca
-SSH_ROLE_ID=$(ssh -o LogLevel=error ubuntu@vault.home.arpa bash << EOF
+export SSH_ROLE_ID=$(ssh -o LogLevel=error ubuntu@vault.home.arpa bash << EOF
 set -euo pipefail
 export VAULT_ADDR=https://vault.home.arpa:8200
 export VAULT_TOKEN=\$(sudo jq -r .root_token /root/vaultinit.json)
@@ -87,13 +104,12 @@ echo $SSH_ROLE_ID > /root/workspace/creds/ssh_host_role_id
 
 for vm in bind step ldap keycloak vault
 do
+  scp -r ./workspace/creds/ssh_host_role_id ubuntu@${vm}.home.arpa:/home/ubuntu/init/creds/
 	ssh ubuntu@${vm}.home.arpa bash << EOF
 set -euo pipefail
-echo $SSH_ROLE_ID > /tmp/ssh_host_role_id
-sudo mv /tmp/ssh_host_role_id /etc/
-sudo /usr/local/bin/getsshcert
-sudo /usr/local/bin/getsshclientca
-sudo /usr/local/bin/getsshserverca
+sudo /usr/local/bin/getsshcert --vault https://vault.home.arpa:8200 --roleid /home/ubuntu/init/creds/ssh_host_role_id
+sudo /usr/local/bin/getsshclientca --vault https://vault.home.arpa:8200
+sudo /usr/local/bin/getsshserverca --vault https://vault.home.arpa:8200 --domain home.arpa
 
 cat << EOC | sudoappend /etc/ssh/sshd_config.d/home.arpa.conf
 TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
@@ -103,43 +119,6 @@ EOC
 sudo systemctl restart sshd
 EOF
 done
-
-# vault oidc login
-VAULT_CLIENT_SECRET=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF
-set -euo pipefail
-cd /opt/keycloak/bin
-#./kcadm.sh config credentials --server https://keycloak.home.arpa:8443 --realm master --user admin --password ${KEYCLOAK_ADMIN_PASSWD}
-
-/usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=vault \
-	-s 'redirectUris=["http://localhost:8250/oidc/callback","https://vault.home.arpa:8250/oidc/callback","https://vault.home.arpa:8200/ui/vault/auth/oidc/oidc/callback"]'
-EOF
-)
-
-ssh ubuntu@vault.home.arpa bash << EOF
-set -euo pipefail
-export VAULT_ADDR=https://vault.home.arpa:8200
-export VAULT_TOKEN=\$(sudo jq -r .root_token /root/vaultinit.json)
-vault write auth/oidc/config \
-         oidc_discovery_url="https://keycloak.home.arpa:8443/realms/infrastructure" \
-         oidc_client_id="vault" \
-         oidc_client_secret="$VAULT_CLIENT_SECRET" \
-         default_role="vault-user"
-
-vault write ssh-client-signer/roles/ssh-role -<<EOR
-  {
-    "algorithm_signer": "rsa-sha2-256",
-    "allow_user_certificates": true,
-    "allowed_users": "ops,{{identity.entity.aliases.\$(vault auth list -format=json | jq -r '.["oidc/"].accessor').name}}",
-    "allowed_users_template": true,
-    "allowed_extensions": "permit-pty",
-    "default_extensions": { "permit-pty": "" },
-    "key_type": "ca",
-    "default_user": "ops",
-    "ttl": "30m0s"
-  }
-EOR
-
-EOF
 
 # step oidc login
 STEP_CLIENT_SECRET=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF

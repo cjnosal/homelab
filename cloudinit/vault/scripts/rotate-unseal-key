@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -z "${VAULT_UNSEAL_KEY:-}" ]]
+then
+  >&2 echo "enter unseal key:"
+  read -s VAULT_UNSEAL_KEY
+fi
+if [[ -z "${VAULT_TOKEN:-}" ]]
+then
+  >&2 echo "enter root token:"
+  read -s VAULT_TOKEN
+fi
+
+source /usr/local/include/vault.env
+
+VAULT_ROTATE=$(vault operator rekey -init -format json -key-shares=1 -key-threshold=1)
+VAULT_NONCE=$(jq -r .nonce <<< $VAULT_ROTATE)
+
+>&2 echo -e "Save the key below. It will not be displayed again:\n\n"
+
+vault operator rekey -format json -nonce $VAULT_NONCE $VAULT_UNSEAL_KEY | jq -r .keys[0]

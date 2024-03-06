@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -z "${VAULT_UNSEAL_KEY:-}" ]]
+then
+  >&2 echo "enter unseal key:"
+  read -s VAULT_UNSEAL_KEY
+fi
+if [[ -z "${VAULT_TOKEN:-}" ]]
+then
+  >&2 echo "enter root token:"
+  read -s VAULT_TOKEN
+fi
+source /usr/local/include/vault.env
+
+VAULT_ROTATE=$(vault operator generate-root -init -format json)
+VAULT_NONCE=$(jq -r .nonce <<< $VAULT_ROTATE)
+VAULT_OTP=$(jq -r .otp <<< $VAULT_ROTATE)
+VAULT_ENCRYPTED_TOKEN=$(vault operator generate-root -format json -nonce=$VAULT_NONCE $VAULT_UNSEAL_KEY | jq -r .encoded_token)
+
+>&2 echo -e "Save the token below. It will not be displayed again:\n\n"
+vault operator generate-root -format json -nonce=$VAULT_NONCE -otp $VAULT_OTP -decode=$VAULT_ENCRYPTED_TOKEN | jq -r .token
+
+if [[ -z "${REVOKE:-}" ]]
+then
+  >&2 echo 'Revoke current token? [Y/n]'
+  read REVOKE
+fi
+
+if [[ "$REVOKE" == "Y" ]]
+then
+  >&2 vault token revoke $VAULT_TOKEN
+fi
