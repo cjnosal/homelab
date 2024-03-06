@@ -3,20 +3,21 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-FLAGS=(skip_domain)
+FLAGS=(skip_domain skip_userdata)
 OPTIONS=(vmname userdata)
 
 help_this="create a new vm with automatic ip and dns. passthrough args to newvm"
 help_skip_domain="do not add DNS records for this host"
+help_skip_userdata="do not execute cloudinit snippet"
 help_vmname="unique name for the new VM"
-help_userdata="filename of the cloudinit user data configuration in the proxmox snippets directory"
+help_skip_domain="do not add DNS records for this host"
+help_userdata="filename (without extension) of the cloudinit user data configuration in the proxmox snippets directory, defaults to vmname"
 
 source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
 parseargs "$@"
 requireargs vmname
 
-userdata=${userdata-$vmname}
 
 echo set up ${vmname}
 export ip=$(./workspace/proxmox/ips next)
@@ -26,8 +27,9 @@ then
   ssh ubuntu@bind.home.arpa addhost.sh ${vmname} $ip
 fi
 
-if [[ -n "${userdata}" ]]
+if [[ "${skip_userdata:-}" != "1" ]]
 then
+  userdata=${userdata:-$vmname}
   ./workspace/cloudinit/${userdata}/generate.sh $ip
   ./workspace/proxmox/newvm --vmname ${vmname} --userdata ${userdata}.yml ${PASSTHROUGH[@]}
 else

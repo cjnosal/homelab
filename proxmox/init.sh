@@ -23,7 +23,7 @@ ssh-add ~/.ssh/vm
 ./workspace/proxmox/updatetemplate || ./workspace/proxmox/createtemplate
 
 # prepare service vms
-./workspace/proxmox/preparevm --vmname bind --userdata "" --skip_domain -- --nameserver 192.168.3.1
+./workspace/proxmox/preparevm --vmname bind --skip_userdata --skip_domain -- --nameserver 192.168.3.1
 ./workspace/proxmox/waitforhost bind.home.arpa
 
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/bind ubuntu@bind.home.arpa:/home/ubuntu/init
@@ -33,7 +33,7 @@ EOF
 
 ssh ubuntu@bind.home.arpa addhost.sh pve 192.168.2.200
 
-./workspace/proxmox/preparevm --vmname step --userdata ""
+./workspace/proxmox/preparevm --vmname step --skip_userdata
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/step ubuntu@step.home.arpa:/home/ubuntu/init
 ssh ubuntu@step.home.arpa sudo bash << EOF
 /home/ubuntu/init/step/runcmd --network "192.168.2.0/23" --domain "home.arpa"
@@ -42,7 +42,7 @@ EOF
 ssh ubuntu@step.home.arpa step ca root > workspace/creds/step_root_ca.crt
 ssh ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca.crt > workspace/creds/step_intermediate_ca.crt
 
-./workspace/proxmox/preparevm --vmname ldap --userdata ""
+./workspace/proxmox/preparevm --vmname ldap --skip_userdata
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap ./workspace/cloudinit/user.yml ubuntu@ldap.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@ldap.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@ldap.home.arpa sudo bash << EOF
@@ -50,7 +50,7 @@ ssh ubuntu@ldap.home.arpa sudo bash << EOF
   --userfile /home/ubuntu/init/user.yml
 EOF
 
-./workspace/proxmox/preparevm --vmname keycloak --userdata "" -- --disk 8
+./workspace/proxmox/preparevm --vmname keycloak --skip_userdata -- --disk 8
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/keycloak ubuntu@keycloak.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@keycloak.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@keycloak.home.arpa sudo bash << EOF
@@ -68,7 +68,7 @@ cd /opt/keycloak/bin
   -s 'redirectUris=["http://localhost:8250/oidc/callback","https://vault.home.arpa:8250/oidc/callback","https://vault.home.arpa:8200/ui/vault/auth/oidc/oidc/callback"]'
 EOF
 
-./workspace/proxmox/preparevm --vmname vault
+./workspace/proxmox/preparevm --vmname vault --skip_userdata
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/vault ubuntu@vault.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@vault.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@vault.home.arpa mkdir /home/ubuntu/init/creds/
