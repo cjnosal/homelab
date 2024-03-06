@@ -12,8 +12,6 @@ export -f generatecred
 
 mkdir -p ./workspace/creds
 
-generatecred > ./workspace/creds/ldap_admin.passwd
-generatecred > ./workspace/creds/keycloak_admin.passwd
 generatecred > ./workspace/creds/user.passwd
 
 eval $(ssh-agent)
