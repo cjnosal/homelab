@@ -1,33 +1,89 @@
 #!/usr/bin/env bash
 set -euo pipefail
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-ZONE=home.arpa
-SUFFIX='dc=home,dc=arpa'
+pushd ${SCRIPT_DIR}
 
-USERNAME=$1
+# args
+OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step)
 
-cat > /usr/local/include/ldap.env << EOF
-   SUFFIX=${SUFFIX}
-   HOST=ldap.${ZONE}
-   DOMAIN=${ZONE}
-EOF
+help_this="initialize workstation"
+help_domain="parent domain of this environment"
+help_userfile="path of user.yml defining profile for workstation user"
+
+help_ldap="url of LDAP host"
+help_step="url of step host"
+help_pve="url of proxmox host"
+help_keycloak="url of keycloak host"
+help_vault="url of vault host"
+help_harbor="url of harbor host"
+help_gitlab="url of gitlab host"
+
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs domain userfile
+set -x
+
+ldap=${ldap:-ldap.${domain}}
+step=${step:-step.${domain}}
+
+#bookmarks
+pve=${pve:-pve.${domain}:8006}
+keycloak=${keycloak:-keycloak.${domain}:8443}
+vault=${vault:-vault.${domain}:8200}
+harbor=${harbor:-harbor.eng.${domain}}
+gitlab=${gitlab:-gitlab.eng.${domain}}
+
+
+# ldap dc components from $domain
+export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
+
+# conf
 
 debconf-set-selections <<EOF
 nslcd nslcd/ldap-reqcert string demand
-nslcd nslcd/ldap-uris string ldaps://ldap.${ZONE}/
-nslcd nslcd/ldap-base string $SUFFIX
+nslcd nslcd/ldap-uris string ldaps://${ldap}
+nslcd nslcd/ldap-base string $suffix
 nslcd nslcd/ldap-cacertfile string /etc/ssl/certs/ca-certificates.crt
 nslcd nslcd/ldap-auth-type string none
 
 ldap-auth-config ldap-auth-config/ldapns/ldap_version string 3
-ldap-auth-config ldap-auth-config/ldapns/base-dn string $SUFFIX
-ldap-auth-config ldap-auth-config/ldapns/ldap-server string ldaps://ldap.${ZONE}
+ldap-auth-config ldap-auth-config/ldapns/base-dn string $suffix
+ldap-auth-config ldap-auth-config/ldapns/ldap-server string ldaps://${ldap}
 ldap-auth-config ldap-auth-config/move-to-debconf boolean true
 ldap-auth-config ldap-auth-config/dbrootlogin boolean false
 ldap-auth-config ldap-auth-config/dblogin boolean false
 
 EOF
 
+sed -e "s|\${ldap}|$ldap|g" -e "s/\${suffix}/$suffix/g" conf/ldap.conf > /etc/ldap/ldap.conf
+cat > /usr/local/include/ldap.env << EOF
+   SUFFIX=${suffix}
+   HOST=${ldap}
+   DOMAIN=${domain}
+EOF
+
+cp conf/.xscreensaver /etc/skel/
+mkdir -p /usr/lib/thunderbird/distribution
+cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
+cp conf/nsswitch.conf /etc/nsswitch.conf
+
+mkdir -p /etc/firefox/policies
+sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  \
+  conf/firefox-policies.json > /etc/firefox/policies/policies.json
+
+# scripts
+sed -e "s|\${vault}|$vault|g" -e "s|\${step}|$step|g" -e "s|\${domain}|$domain|g"  scripts/.homelab > /etc/skel/.homelab
+cp ../ldap/scripts/* /usr/local/bin/
+cp ../ldap/include/* /usr/local/include/
+cp ../keycloak/scripts/* /usr/local/bin/
+cp ../vault/scripts/* /usr/local/bin/
+
+
+# packages
 wget --progress=dot:giga https://github.com/carvel-dev/ytt/releases/download/v0.46.3/ytt-linux-amd64 -O /usr/local/bin/ytt
 chmod a+rx /usr/local/bin/ytt
 
@@ -40,48 +96,66 @@ wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dear
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
 apt-get update
+apt-get install -y bind9utils dnsutils jq openjdk-19-jre-headless thunderbird apache2-utils
 apt-get install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
-
-service xrdp restart
-sudo systemctl enable nslcd
-systemctl start nslcd
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 tar -xf keycloak-22.0.0.tar.gz
 mv keycloak-22.0.0/bin/* /usr/local/bin/
 rm keycloak-22.0.0.tar.gz
 
-curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.${ZONE}:8443/step_root_ca.crt
-curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.${ZONE}:8443/step_intermediate_ca.crt
+wget --progress=dot:giga https://get.pinniped.dev/v0.28.0/pinniped-cli-linux-amd64
+mv pinniped-cli-linux-amd64 /usr/local/bin/pinniped
+chmod a+rx /usr/local/bin/pinniped
+
+wget --progress=dot:giga https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+chmod +x /usr/local/bin/yq
+
+snap install helm --classic
+snap install kubectl --classic
+
+apt-get install -y docker.io docker-compose
+
+wget --progress=dot:giga https://github.com/docker/docker-credential-helpers/releases/download/v0.8.1/docker-credential-secretservice-v0.8.1.linux-amd64 \
+  -O /usr/local/bin/docker-credential-secretservice
+chmod a+rx /usr/local/bin/docker-credential-secretservice
+
+# user
+user=$(yq .username $userfile)
+givenname=$(yq .givenname $userfile)
+surname=$(yq .surname $userfile)
+gecos="${givenname} ${surname}"
+sed -e "s/\${USER}/${user}/g" conf/sudoers > /etc/sudoers.d/92-${user}
+id -u ${user} || adduser --home /home/${user} --shell /bin/bash --disabled-password --gecos "${gecos}" ${user}
+
+# setup
+service xrdp restart
+sudo systemctl enable nslcd
+systemctl start nslcd
+
+
+
+curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://${step}:8443/step_root_ca.crt
+curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://${step}:8443/step_intermediate_ca.crt
 
 mkdir -p /etc/firefox/ca-certificates
 chmod a+rx /etc/firefox/ca-certificates
 cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
 chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
 
-wget --progress=dot:giga https://get.pinniped.dev/v0.28.0/pinniped-cli-linux-amd64
-mv pinniped-cli-linux-amd64 /usr/local/bin/pinniped
-chmod a+rx /usr/local/bin/pinniped
 
-snap install helm --classic
-snap install kubectl --classic
-snap install yq
+usermod -aG docker $user
 
-apt-get install -y docker.io docker-compose
-usermod -aG docker $USERNAME
+export user
 
-export USERNAME
 
-wget --progress=dot:giga https://github.com/docker/docker-credential-helpers/releases/download/v0.8.1/docker-credential-secretservice-v0.8.1.linux-amd64 \
-  -O /usr/local/bin/docker-credential-secretservice
-chmod a+rx /usr/local/bin/docker-credential-secretservice
 
-mkdir -p /home/${USERNAME}/.docker
-cat > /home/${USERNAME}/.docker/config.json <<EOF
+mkdir -p /home/${user}/.docker
+cat > /home/${user}/.docker/config.json <<EOF
 {
   "credsStore": "secretservice"
 }
 EOF
-chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.docker
+chown -R ${user}:${user} /home/${user}/.docker
 
 shutdown -r +1

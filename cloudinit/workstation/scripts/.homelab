@@ -1,0 +1,20 @@
+export VAULT_ADDR=https://${vault}
+if [[ ! -d ~/.step ]]
+then
+  step ca bootstrap --ca-url https://${step} --install --fingerprint $(curl -fSsL https://${step}:8443/fingerprint)
+fi
+if [[ ! -d ~/.kube ]]
+then
+  mkdir -p ~/.kube
+  curl -fSsL https://k8s-core-master.${domain}:8443/kubeconfig > ~/.kube/core-config
+  curl -fSsL https://k8s-run-master.${domain}:8443/kubeconfig > ~/.kube/run-config
+
+  KUBECONFIG=~/.kube/core-config:~/.kube/run-config kubectl config view --flatten > ~/.kube/config
+  chmod 400 ~/.kube/config
+
+  kubectl config use-context core-user@core-pinniped
+fi
+if [[ ! -f ~/.ssh/id_rsa ]]
+then
+  ssh-keygen -t rsa -f ~/.ssh/id_rsa -C $(whoami)@${domain} -N ""
+fi

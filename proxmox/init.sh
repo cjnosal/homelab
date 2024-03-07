@@ -146,7 +146,16 @@ step ca provisioner update keycloak --admin=step-provisioner-admin  $CONFIG
 sudo systemctl restart step-ca
 EOF
 
-./workspace/proxmox/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
+./workspace/proxmox/preparevm --vmname workstation --skip_userdata -- --cores 4 --memory 8192 --disk 32
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap \
+  ./workspace/cloudinit/keycloak ./workspace/cloudinit/vault \
+  ./workspace/cloudinit/workstation ./workspace/cloudinit/user.yml \
+  ubuntu@workstation.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@workstation.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@workstation.home.arpa mkdir /home/ubuntu/init/creds/
+ssh ubuntu@workstation.home.arpa sudo bash << EOF
+/home/ubuntu/init/workstation/runcmd --domain "home.arpa" --userfile /home/ubuntu/init/user.yml
+EOF
 
 ./workspace/proxmox/preparevm --vmname mail -- --disk 8
 DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF

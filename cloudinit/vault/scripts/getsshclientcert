@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS=(vault)
+
+help_this="create short-lived ssh client certificate"
+help_vault="vault server url"
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs vault
+
+if [[ ! -f ~/.ssh/id_rsa ]]
+then
+  ssh-keygen -t rsa -f ~/.ssh/id_rsa -C $(whoami) -N ""
+fi
+
+export VAULT_ADDR=$vault
+
+vault login -no-print -method=oidc role=ssh-ops username=$(whoami)
+
+vault write -field=signed_key ssh-client-signer/sign/ssh-role public_key=@$HOME/.ssh/id_rsa.pub valid_principals=ops > ~/.ssh/id_rsa-cert.pub

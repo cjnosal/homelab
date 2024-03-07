@@ -1,0 +1,48 @@
+{
+  "policies": {
+    "Certificates": {
+      "ImportEnterpriseRoots": true,
+      "Install": [
+        "/etc/firefox/ca-certificates/step_root_ca.crt"
+      ]
+    },
+    "ManagedBookmarks": [
+      {
+        "toplevel_name": "Homelab"
+      },
+      {
+        "name": "Proxmox",
+        "url": "https://${pve}"
+      },
+      {
+        "name": "Keycloak",
+        "children": [
+          {
+            "url": "https://${keycloak}/admin/master/console",
+            "name": "admin console - master realm"
+          },
+          {
+            "url": "https://${keycloak}/admin/infrastructure/console",
+            "name": "admin console - infrastructure realm"
+          },
+          {
+            "url": "https://${keycloak}/realms/infrastructure/account/#/",
+            "name": "account - infrastructure realm"
+          }
+        ]
+      },
+      {
+        "name": "Vault",
+        "url": "https://${vault}/ui/vault/auth?with=oidc"
+      },
+      {
+        "name": "Harbor",
+        "url": "https://${harbor}"
+      },
+      {
+        "name": "Gitlab",
+        "url": "https://${gitlab}"
+      }
+    ]
+  }
+}
