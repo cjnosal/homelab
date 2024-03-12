@@ -318,6 +318,6 @@ echo Bootstrap complete - use the username you selected in cloudinit/user.yml an
 cat ./workspace/creds/user.passwd
 rm ./workspace/creds/user.passwd
 echo
-echo Once logged in, run \`changeldappassword\`
+echo Once logged in, run \`changeldappassword --domain home.arpa --ldap ldaps://ldap.home.arpa\`
 echo
 echo "Admin credentials at /root/workspace/creds/ should be saved in an encrypted backup (not in vault) in case of lockout"
