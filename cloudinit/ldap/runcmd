@@ -126,11 +126,11 @@ addldapuser $username $givenname $surname $email
 
 # mail
 # postmaster/abuse mailbox
-addldapuser webmaster Web Master webmaster@home.arpa
+addldapuser webmaster Web Master webmaster@${domain}
 # sent to non-existent account
-addldapuser catchall Catch All catchall@home.arpa
+addldapuser catchall Catch All catchall@${domain}
 # service account
-addldapuser mailbot Mail Bot mailbot@home.arpa
+addldapuser mailbot Mail Bot mailbot@${domain}
 
 # first user is admin of all components
 addldapusertogroup $username keycloak-realm-admin

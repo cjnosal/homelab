@@ -5,18 +5,19 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(domain acme ldap)
+OPTIONS=(domain acme ldap mail)
 
 help_this="initialize keycloak oidc server"
 help_domain="parent domain of this environment"
 help_acme="acme directory url to acquire TLS cert"
 help_ldap="url of LDAP host"
+help_mail="mail server"
 
 ../base/runcmd
 
 source /usr/local/include/argshelper
 parseargs $@
-requireargs domain acme ldap
+requireargs domain acme ldap mail
 
 export hostname=$(hostname | cut -d'.' -f1)
 
@@ -106,7 +107,7 @@ do
 	sleep 2
 done
 
-create-realm --username admin --password ${admincred} --authrealm master --realm infrastructure
+create-realm --username admin --password ${admincred} --authrealm master --realm infrastructure --mail ${mail}
 
 sync-realm --username admin --password ${admincred} --authrealm master --realm infrastructure
 

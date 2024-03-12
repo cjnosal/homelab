@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd /opt/keycloak/bin
 
-OPTIONS=(username password authrealm realm)
+OPTIONS=(username password authrealm realm mail)
 
 help_this="create a realm with ldap federation"
 
@@ -11,6 +11,7 @@ help_username="keycloak admin"
 help_password="keycloak admin's password"
 help_authrealm="realm the keycloak admin belongs to"
 help_realm="realm to create"
+help_mail="mail server"
 
 authrealm=${authrealm:-master}
 realm=${realm:-infrastructure}
@@ -19,7 +20,7 @@ source /usr/local/include/argshelper
 source /usr/local/include/keycloak.env
 
 parseargs $@
-requireargs authrealm realm
+requireargs authrealm realm mail
 
 if [[ -z "$username" ]]
 then
@@ -36,7 +37,7 @@ fi
 ./kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
 ./kcadm.sh create realms -s enabled=true -s realm=${realm} \
   -s verifyEmail=true \
-  -s 'smtpServer.host=mail.home.arpa' \
+  -s "smtpServer.host=${mail}" \
   -s 'smtpServer.starttls=true' \
   -s 'smtpServer.auth=false' \
   -s 'smtpServer.fromDisplayName=Keycloak' \
