@@ -157,7 +157,15 @@ ssh ubuntu@workstation.home.arpa sudo bash << EOF
 /home/ubuntu/init/workstation/runcmd --domain "home.arpa" --userfile /home/ubuntu/init/user.yml
 EOF
 
-./workspace/proxmox/preparevm --vmname mail -- --disk 8
+./workspace/proxmox/preparevm --vmname mail --skip_userdata -- --disk 8
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/mail \
+  ubuntu@mail.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@mail.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@mail.home.arpa sudo bash << EOF
+/home/ubuntu/init/mail/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --network 192.168.2.0/23 --nameserver 192.168.2.201 --ldap ldaps://ldap.home.arpa
+EOF
+
 DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
 sudo cat /etc/opendkim/mail.txt | cut -d'(' -f2 | cut -d')' -f1 | xargs
 EOF

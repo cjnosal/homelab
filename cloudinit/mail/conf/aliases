@@ -1,0 +1,3 @@
+postmaster: webmaster@${domain}
+root: webmaster@${domain}
+www-data: webmaster@${domain}

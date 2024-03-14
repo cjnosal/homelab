@@ -1,0 +1,14 @@
+passdb {
+  driver = ldap
+  args = /etc/dovecot/dovecot-ldap.conf.ext
+}
+
+userdb {
+  driver = static
+  args = uid=5000 gid=5000 home=/var/mail/vmail/${domain}/%n domain=${domain}
+}
+
+userdb {
+  driver = ldap
+  args = /etc/dovecot/dovecot-ldap.conf.ext
+}

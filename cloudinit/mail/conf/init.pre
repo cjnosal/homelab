@@ -1,0 +1,12 @@
+# URIDNSBL - look up URLs found in the message against several DNS
+# blocklists.
+#
+loadplugin Mail::SpamAssassin::Plugin::URIDNSBL
+
+# SPF - perform SPF verification.
+#
+loadplugin Mail::SpamAssassin::Plugin::SPF
+
+## Add TextCat to assist enable language-based filtering
+#
+loadplugin Mail::SpamAssassin::Plugin::TextCat

@@ -1,16 +1,73 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export ZONE=home.arpa
-SUFFIX='dc=home,dc=arpa'
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-export CERT_GROUP=mail
-export FULLCHAIN_PATH=/etc/ssl/certs/tls.crt
-export PRIVKEY_PATH=/etc/ssl/private/tls.key
-initcertbot mail.${ZONE}
+pushd ${SCRIPT_DIR}
+
+# args
+
+OPTIONS=(domain acme ldap network nameserver)
+
+help_this="initialize mail server"
+help_domain="parent domain of this environment"
+help_acme="acme directory url to acquire TLS cert"
+help_ldap="ldap directory url"
+help_network="internal network cidr"
+help_nameserver="IP address of DNS resolver"
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs domain acme ldap network nameserver
+
+# ldap dc components from $domain
+export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
+
+hostname=$(hostname)
+
+# conf
+mkdir -p /etc/dovecot/conf.d
+mkdir -p /etc/postfix
+mkdir -p /etc/clamav
+mkdir -p /etc/spamassassin
+mkdir -p /etc/opendkim
+mkdir -p /var/mail/vmail/sieve-before
+mkdir -p /var/lib/spamassassin/.razor
+
+cp conf/10-auth.conf /etc/dovecot/conf.d/10-auth.conf
+sed -e "s/\${domain}/${domain}/g" conf/999-mail-stack-delivery.conf > /etc/dovecot/conf.d/999-mail-stack-delivery.conf
+sed -e "s/\${domain}/${domain}/g" conf/aliases > /etc/aliases
+sed -e "s/\${domain}/${domain}/g" conf/auth-ldap.conf.ext > /etc/dovecot/conf.d/auth-ldap.conf.ext
+sed -e "s/\${domain}/${domain}/g" conf/canonical > /etc/postfix/canonical
+cp conf/clamav-milter /etc/default/clamav-milter
+cp conf/clamav-milter.conf /etc/clamav/clamav-milter.conf
+cp conf/default.sieve /var/mail/vmail/sieve-before/default.sieve
+sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/dovecot-ldap.conf.ext > /etc/dovecot/dovecot-ldap.conf.ext
+cp conf/init.pre /etc/spamassassin/init.pre
+sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/KeyTable > /etc/opendkim/KeyTable
+sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-accounts.cf > /etc/dovecot/ldap-accounts.cf
+sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-aliases.cf > /etc/dovecot/ldap-aliases.cf
+sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-senders.cf > /etc/dovecot/ldap-senders.cf
+cp conf/local.cf /etc/spamassassin/local.cf
+sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/mailname > /etc/mailname
+sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g"  -e "s|\${network}|${network}|g" conf/main.cf > /etc/postfix/main.cf
+cp conf/master.cf /etc/postfix/master.cf
+sed -e "s/\${nameserver}/${nameserver}/g" conf/opendkim.conf > /etc/opendkim.conf
+cp conf/razor-agent.conf /var/lib/spamassassin/.razor/razor-agent.conf
+sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/SigningTable > /etc/opendkim/SigningTable
+cp conf/spamass-milter /etc/default/spamass-milter
+cp conf/spamassassin /etc/default/spamassassin
+cp conf/TrustedHosts /etc/opendkim/TrustedHosts
+sed -e "s/\${domain}/${domain}/g" conf/virtual > /etc/postfix/virtual
+sed -e "s/\${domain}/${domain}/g" conf/virtual-mailbox-domains > /etc/postfix/virtual-mailbox-domains
+
+# setup
+initcertbot --acme $acme --group mail --san ${hostname}.${domain} --fullchain /etc/ssl/certs/tls.crt --key /etc/ssl/private/tls.key
 
 debconf-set-selections <<EOF
-postfix postfix/mailname        string  mail.${ZONE}
+postfix postfix/mailname        string  ${hostname}.${domain}
 postfix postfix/main_mailer_type        select  Internet Site
 EOF
 
@@ -48,7 +105,7 @@ service dovecot restart
 
 
 # dkim setup
-opendkim-genkey -r -h sha256 -d mail.${ZONE} -s mail --directory /etc/opendkim
+opendkim-genkey -r -h sha256 -d ${hostname}.${domain} -s mail --directory /etc/opendkim
 ln -s /etc/opendkim/mail.private /etc/opendkim/mail
 chmod 400 /etc/opendkim/mail.private
 

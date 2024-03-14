@@ -1,0 +1,3 @@
+#! override default from address of local service accounts
+#! e.g.
+#! www-data@${domain} myservice@${domain}

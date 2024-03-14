@@ -1,0 +1,8 @@
+catchall@${domain}   catchall@${domain}
+webmaster@${domain}  webmaster@${domain}
+postmaster@${domain} webmaster@${domain}
+root@mail.${domain}  webmaster@${domain}
+root@${domain}       webmaster@${domain}
+abuse@${domain}      webmaster@${domain}
+hostmaster@${domain} webmaster@${domain}
+@${domain}           catchall@${domain}

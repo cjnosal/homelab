@@ -1,0 +1,8 @@
+server_host = ${ldap}
+server_port = 636
+version = 3
+bind = no
+search_base = ${suffix}
+scope = sub
+query_filter = (&(objectClass=inetOrgPerson)(|(uid=%u)(mail=%s)))
+result_attribute = uid

@@ -1,0 +1,1 @@
+OPTIONS="-u spamass-milter -i 127.0.0.1 -m -I -- --socket=/var/spool/postfix/spamassassin/spamd.sock"

@@ -1,0 +1,8 @@
+uris = ${ldap}
+auth_bind = yes
+auth_bind_userdn = uid=%n,ou=people,${suffix}
+base = ${suffix}
+user_filter = (&(objectClass=inetOrgPerson)(|(uid=%n)(mail=%u)))
+iterate_filter = (objectClass=inetOrgPerson)
+debug_level = 0
+pass_filter = (&(objectClass=inetOrgPerson)(|(uid=%n)(mail=%u)))

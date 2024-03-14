@@ -3,9 +3,34 @@
 ## setup
 
 ```
-export IP=$(./workspace/proxmox/ips next)
-./workspace/cloudinit/mail/generate.sh $IP
-./workspace/proxmox/newvm --vmname mail --userdata mail.yml --ip $IP
+./workspace/proxmox/preparevm --vmname mail --skip_userdata -- --disk 8
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/mail \
+  ubuntu@mail.home.arpa:/home/ubuntu/init
+scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@mail.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@mail.home.arpa sudo bash << EOF
+/home/ubuntu/init/mail/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+  --network 192.168.2.0/23 --nameserver 192.168.2.201 --ldap ldaps://ldap.home.arpa
+EOF
+```
+
+### configure dns records
+```
+DKIM="$(ssh -o LogLevel=error ubuntu@mail.home.arpa bash << EOF
+sudo cat /etc/opendkim/mail.txt | cut -d'(' -f2 | cut -d')' -f1 | xargs
+EOF
+)"
+
+ssh ubuntu@bind.home.arpa bash << EOF
+set -euo pipefail
+sudo nsupdate -l -4 <<EOD
+zone home.arpa
+update add home.arpa. 60 MX 10 mail.home.arpa.
+update add mail._domainkey.home.arpa 60 TXT $DKIM
+update add home.arpa. 60 TXT "v=spf1 mx a ?all"
+send
+EOD
+
+EOF
 ```
 
 ### set ldap passwords for default accounts
