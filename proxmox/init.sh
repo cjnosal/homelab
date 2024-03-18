@@ -22,12 +22,12 @@ ssh-add ~/.ssh/vm
 
 # prepare service vms
 ./workspace/proxmox/preparevm --vmname bind --skip_userdata --skip_domain -- --nameserver 192.168.3.1
-./workspace/proxmox/waitforhost bind.home.arpa
 
-scp -r ./workspace/cloudinit/base ./workspace/cloudinit/bind ubuntu@bind.home.arpa:/home/ubuntu/init
-ssh ubuntu@bind.home.arpa sudo bash << EOF
+scp -r ./workspace/cloudinit/base ./workspace/cloudinit/bind ubuntu@192.168.2.201:/home/ubuntu/init
+ssh ubuntu@192.168.2.201 sudo bash << EOF
 /home/ubuntu/init/bind/runcmd --network "192.168.2.0/23" --forwarders "192.168.3.1" --zone "home.arpa" --reverse_zone "2.168.192.in-addr.arpa"
 EOF
+./workspace/proxmox/waitforhost bind.home.arpa
 
 ssh ubuntu@bind.home.arpa addhost.sh pve 192.168.2.200
 
