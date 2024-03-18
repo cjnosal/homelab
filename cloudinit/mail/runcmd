@@ -44,12 +44,12 @@ sed -e "s/\${domain}/${domain}/g" conf/canonical > /etc/postfix/canonical
 cp conf/clamav-milter /etc/default/clamav-milter
 cp conf/clamav-milter.conf /etc/clamav/clamav-milter.conf
 cp conf/default.sieve /var/mail/vmail/sieve-before/default.sieve
-sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/dovecot-ldap.conf.ext > /etc/dovecot/dovecot-ldap.conf.ext
+sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/dovecot-ldap.conf.ext > /etc/dovecot/dovecot-ldap.conf.ext
 cp conf/init.pre /etc/spamassassin/init.pre
 sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/KeyTable > /etc/opendkim/KeyTable
-sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-accounts.cf > /etc/dovecot/ldap-accounts.cf
-sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-aliases.cf > /etc/dovecot/ldap-aliases.cf
-sed -e "s/\${ldap}/${ldap}/g" -e "s/\${suffix}/${suffix}/g" conf/ldap-senders.cf > /etc/dovecot/ldap-senders.cf
+sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-accounts.cf > /etc/postfix/ldap-accounts.cf
+sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-aliases.cf > /etc/postfix/ldap-aliases.cf
+sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-senders.cf > /etc/postfix/ldap-senders.cf
 cp conf/local.cf /etc/spamassassin/local.cf
 sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/mailname > /etc/mailname
 sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g"  -e "s|\${network}|${network}|g" conf/main.cf > /etc/postfix/main.cf
