@@ -1,0 +1,19 @@
+{
+        skip_install_trust
+        ocsp_stapling off
+        https_port 8443
+}
+
+${hostname}.${domain}:8443 {
+        tls {
+                # must be on port 443, which is taken by step online CA
+                # http challenge must be on port 80, which is free
+                issuer acme ${acme} {
+                        email caddy@${domain}
+                        disable_tlsalpn_challenge
+                        trusted_roots /etc/ssl/certs/ca-certificates.crt
+                }
+        }
+        root * /usr/share/caddy
+        file_server
+}

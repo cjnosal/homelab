@@ -1,19 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-node=$1 # master/worker
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-K8S_VER=v1.28
+pushd ${SCRIPT_DIR}
+
+# args
+OPTIONS=(domain node version acme)
+
+help_this="initialize kubernetes node"
+help_domain="parent domain of this environment"
+help_node="type of node (master|worker)"
+help_version="kubernetes version (e.g. v1.28)"
+help_acme="acme directory url to acquire TLS cert"
+
+../base/runcmd
+
+source /usr/local/include/argshelper
+parseargs $@
+requireargs domain node version acme
+
+export hostname=$(hostname)
 
 swapoff -a
 
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
   gpg jq apt-transport-https ca-certificates curl
 
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${K8S_VER}/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${version}/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
 chmod 600 /etc/apt/sources.list.d/kubernetes.list
 
-curl -fsSL https://pkgs.k8s.io/core:/stable:/${K8S_VER}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/${version}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 apt-get update
 
 DEBIAN_FRONTEND=noninteractive apt-get -y  -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install \
@@ -56,6 +73,7 @@ kubeadm config images pull
 
 if [[ "$node" == "master" ]]
 then
+        sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/kubeadmconfig.yml > /root/kubeadmconfig.yml
         kubeadm init \
           --node-name $(hostname) \
           --skip-token-print \
@@ -81,36 +99,15 @@ then
         mv pinniped-cli-linux-amd64 /usr/local/bin/pinniped
         chmod a+rx /usr/local/bin/pinniped
 
-        curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-        curl -fSsL 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-        apt-get update
-        mkdir -p /etc/caddy
-        cat > /etc/caddy/Caddyfile << EOF
-{
-        skip_install_trust
-        ocsp_stapling off
-        https_port 8443
-}
-
-$(hostname).home.arpa:8443 {
-        tls {
-                # must be on port 443, which is taken by step online CA
-                # http challenge must be on port 80, which is free
-                issuer acme https://step.home.arpa/acme/acme/directory {
-                        email caddy@step.home.arpa
-                        disable_tlsalpn_challenge
-                        trusted_roots /etc/ssl/certs/ca-certificates.crt
-                }
-        }
-        root * /usr/share/caddy
-        file_server
-}
-EOF
-        apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" --force-yes caddy
-        rm /usr/share/caddy/index.html
+        # caddy
+        addcaddy.sh
+        sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" -e "s|\${acme}|${acme}|g" conf/Caddyfile > /etc/caddy/Caddyfile
+        systemctl restart caddy
+        systemctl is-active caddy --wait
+        while ! curl -SsL https://${hostname}.${domain}:8443/; do echo waiting for caddy tls; sleep 2; done
 
 else
-	/root/joincmd
+	/home/ubuntu/init/creds/joincmd
 fi
 
 echo done k8s setup

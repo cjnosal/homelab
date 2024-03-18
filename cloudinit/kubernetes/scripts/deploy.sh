@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FLAGS=(supervisor)
-OPTIONS=(cluster cert_manager_tsig_name external_dns_tsig_name client_id lb_addresses workers subdomain)
+OPTIONS=(cluster cert_manager_tsig_name external_dns_tsig_name client_id lb_addresses workers subdomain acme domain nameserver pinniped keycloak vault)
 
 help_this="prepare cluster networking utilities"
 
@@ -13,12 +13,18 @@ help_client_id="oidc id for pinniped's upstream identity provider"
 help_lb_addresses="ip list or range for metallb to allocate"
 help_supervisor="install pinniped supervisor in this cluster"
 help_workers="number of worker nodes"
-help_subdomain="DNS subdomain for nginx ingress"
+help_subdomain="DNS subdomain for ingress"
+help_acme="url of acme directory"
+help_domain="parent domain of this environment"
+help_nameserver="nameserver address"
+help_pinniped="hostname of pinniped supervisor"
+help_keycloak="url of oidc host"
+help_vault="url of vault host"
 
 source /usr/local/include/argshelper
 
 parseargs $@
-requireargs cluster
+requireargs cluster acme domain nameserver vault
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
@@ -100,11 +106,11 @@ helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namesp
   --set logs.access.enabled=true
 
 # tls
-STEP_CA=$(curl -fSsL https://step.home.arpa:8443/step_root_ca.crt)
-STEP_CA_B64=$(base64 -w0 <<< $STEP_CA)
+STEP_CA=$(cat /usr/local/share/ca-certificates/step_root_ca.crt)
+STEP_CA_B64=$(base64 -w0 < /usr/local/share/ca-certificates/step_root_ca.crt)
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm upgrade -i -n cert-manager cert-manager jetstack/cert-manager --set installCRDs=true --wait --create-namespace
-helm upgrade -i -n cert-manager trust-manager jetstack/trust-manager --set secretTargets.enabled=true --set-json secretTargets.authorizedSecrets='["home.arpa","ca-bundle"]' --wait
+helm upgrade -i -n cert-manager trust-manager jetstack/trust-manager --set secretTargets.enabled=true --set-json secretTargets.authorizedSecrets="[\"${domain}\",\"ca-bundle\"]" --wait
 
 kubectl create secret generic -n cert-manager --from-literal=ca.crt="$STEP_CA" step-root-ca \
   || kubectl get secret -n cert-manager step-root-ca
@@ -117,7 +123,7 @@ metadata:
   name: step-issuer
 spec:
   acme:
-    server: https://step.home.arpa/acme/acme/directory
+    server: ${acme}
     privateKeySecretRef:
       name: step-account-key
     caBundle: "$STEP_CA_B64"
@@ -143,14 +149,14 @@ metadata:
   name: bind-issuer
 spec:
   acme:
-    server: https://step.home.arpa/acme/acme/directory
+    server: ${acme}
     privateKeySecretRef:
       name: step-account-key-bind
     caBundle: "$STEP_CA_B64"
     solvers:
     - dns01:
         rfc2136:
-          nameserver: bind.home.arpa
+          nameserver: ${nameserver}
           tsigKeyName: $cert_manager_tsig_name
           tsigAlgorithm: HMACSHA512
           tsigSecretSecretRef:
@@ -164,7 +170,7 @@ kubectl apply -f- << EOF
 apiVersion: trust.cert-manager.io/v1alpha1
 kind: Bundle
 metadata:
-  name: home.arpa
+  name: ${domain}
 spec:
   sources:
   - secret:
@@ -172,7 +178,7 @@ spec:
       key: "ca.crt"
   target:
     configMap:
-      key: "home.arpa.pem"
+      key: "${domain}.pem"
     secret:
       key: "ca.crt"
     namespaceSelector:
@@ -209,7 +215,7 @@ metadata:
   name: pinniped-supervisor-loadbalancer
   namespace: pinniped-supervisor
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: pinniped.eng.home.arpa
+    external-dns.alpha.kubernetes.io/hostname: ${pinniped}
 spec:
   type: LoadBalancer
   selector:
@@ -230,7 +236,7 @@ spec:
     name: bind-issuer
     kind: ClusterIssuer
   dnsNames:
-  - "pinniped.eng.home.arpa"
+  - "${pinniped}"
 ---
 apiVersion: idp.supervisor.pinniped.dev/v1alpha1
 kind: OIDCIdentityProvider
@@ -238,7 +244,7 @@ metadata:
   namespace: pinniped-supervisor
   name: keycloak
 spec:
-  issuer: "https://keycloak.home.arpa:8443/realms/infrastructure"
+  issuer: "${keycloak}/realms/infrastructure"
   tls:
     certificateAuthorityData: "$STEP_CA_B64"
   authorizationConfig:
@@ -266,7 +272,7 @@ metadata:
   name: homelab-federation-domain
   namespace: pinniped-supervisor
 spec:
-  issuer: "https://pinniped.eng.home.arpa/homelab-issuer"
+  issuer: "https://${pinniped}/homelab-issuer"
   tls:
     secretName: supervisor-tls-cert
   identityProviders:
@@ -306,7 +312,7 @@ metadata:
   name: pinniped-authenticator
   namespace: pinniped-concierge
 spec:
-  issuer: "https://pinniped.eng.home.arpa/homelab-issuer"
+  issuer: "https://${pinniped}/homelab-issuer"
   audience: $cluster
   tls:
     certificateAuthorityData: "$STEP_CA_B64"
@@ -404,9 +410,9 @@ spec:
         - --txt-prefix=k8s-${cluster}-external-dns-
         - --txt-owner-id=k8s-${cluster}
         - --provider=rfc2136
-        - --rfc2136-host=bind.home.arpa
+        - --rfc2136-host=${nameserver}
         - --rfc2136-port=53
-        - --rfc2136-zone=home.arpa
+        - --rfc2136-zone=${domain}
         - --rfc2136-tsig-secret=$(cat /home/ubuntu/external-dns.tsig)
         - --rfc2136-tsig-secret-alg=hmac-sha512
         - --rfc2136-tsig-keyname=${external_dns_tsig_name}
@@ -415,7 +421,7 @@ spec:
         - --source=ingress
         - --source=service
         - --source=traefik-proxy
-        - --domain-filter=.${subdomain}.home.arpa
+        - --domain-filter=.${subdomain}.${domain}
         - --policy=sync
         - --log-level=info
         - --txt-cache-interval=5m
@@ -431,8 +437,8 @@ kubectl create namespace vault-secrets-operator-system
 kubectl label namespace vault-secrets-operator-system 'smallstep.com/inject'="enabled"
 helm upgrade --install vault-secrets-operator hashicorp/vault-secrets-operator -n vault-secrets-operator-system --wait \
   --set "defaultVaultConnection.enabled=true" \
-  --set "defaultVaultConnection.address=https://vault.home.arpa:8200" \
-  --set "defaultVaultConnection.caCertSecret=home.arpa"
+  --set "defaultVaultConnection.address=${vault}" \
+  --set "defaultVaultConnection.caCertSecret=${domain}"
 
 
 # Allow admins full access
