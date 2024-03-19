@@ -66,6 +66,17 @@ cat > /usr/local/include/ldap.env << EOF
    DOMAIN=${domain}
 EOF
 
+cat > /usr/local/include/vault.env << EOF
+export VAULT_ADDR=https://${vault}
+EOF
+
+cat > /usr/local/include/keycloak.env << EOF
+SUFFIX=${suffix}
+HOST=https://${keycloak}
+DOMAIN=${domain}
+LDAP_HOST=${ldap}
+EOF
+
 cp conf/.xscreensaver /etc/skel/
 mkdir -p /usr/lib/thunderbird/distribution
 cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
@@ -77,6 +88,7 @@ sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault
 
 # scripts
 sed -e "s|\${vault}|$vault|g" -e "s|\${step}|$step|g" -e "s|\${domain}|$domain|g"  scripts/.homelab > /etc/skel/.homelab
+chmod a+rx /etc/skel/.homelab
 cp ../ldap/scripts/* /usr/local/bin/
 cp ../ldap/include/* /usr/local/include/
 cp ../keycloak/scripts/* /usr/local/bin/

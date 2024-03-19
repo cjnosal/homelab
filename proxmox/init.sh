@@ -5,14 +5,7 @@ pushd /root/
 
 # init
 
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
-
 mkdir -p ./workspace/creds
-
-generatecred > ./workspace/creds/user.passwd
 
 eval $(ssh-agent)
 ssh-add ~/.ssh/vm
@@ -120,7 +113,7 @@ EOF
 done
 
 # step oidc login
-STEP_CLIENT_SECRET=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF
+export STEP_CLIENT_SECRET=$(ssh -o LogLevel=error ubuntu@keycloak.home.arpa bash << EOF
 set  -euo pipefail
 /usr/local/bin/create-client --username admin --password ${KEYCLOAK_ADMIN_PASSWD} --authrealm master --realm infrastructure -- -s clientId=step-ca \
 	-s 'redirectUris=["http://127.0.0.1:10000/*"]' || \
@@ -128,7 +121,7 @@ set  -euo pipefail
 EOF
 )
 
-CONFIG="--ca-url https://step.home.arpa --admin-subject=step --password-file /etc/step-ca/password.txt \
+export CONFIG="--ca-url https://step.home.arpa --admin-subject=step --password-file /etc/step-ca/password.txt \
   --admin-provisioner cert-provisioner"
 
 ssh ubuntu@step.home.arpa sudo bash << EOF
@@ -152,6 +145,7 @@ scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap \
   ./workspace/cloudinit/workstation ./workspace/cloudinit/user.yml \
   ubuntu@workstation.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@workstation.home.arpa:/home/ubuntu/init/certs
+scp -r ./workspace/kubernetes ubuntu@workstation.home.arpa:/home/ubuntu/init/kubernetes
 ssh ubuntu@workstation.home.arpa mkdir /home/ubuntu/init/creds/
 ssh ubuntu@workstation.home.arpa sudo bash << EOF
 /home/ubuntu/init/workstation/runcmd --domain "home.arpa" --userfile /home/ubuntu/init/user.yml
@@ -326,12 +320,19 @@ then
 fi
 echo "$NEW_KEYCLOAK_PASSWORD" > ./workspace/creds/keycloak_admin.passwd
 
+USER_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.home.arpa bash << EOF
+sudo cat /root/user.passwd
+sudo rm /root/user.passwd
+EOF
+)
+
 # prompt
 echo
 echo Bootstrap complete - use the username you selected in cloudinit/user.yml and this temporary password to log in to workstation.home.arpa:
-cat ./workspace/creds/user.passwd
-rm ./workspace/creds/user.passwd
+echo ${USER_PASSWORD}
 echo
 echo Once logged in, run \`changeldappassword --domain home.arpa --ldap ldaps://ldap.home.arpa\`
+echo
+echo Run \`~/.homelab\` to initialize CLIs
 echo
 echo "Admin credentials at /root/workspace/creds/ should be saved in an encrypted backup (not in vault) in case of lockout"

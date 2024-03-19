@@ -9,6 +9,7 @@ OPTIONS=(gitlab_admin)
 help_gitlab_admin="LDAP user to add to the new gitlab-admin group"
 
 source /usr/local/include/argshelper
+source /usr/local/include/ldap.env
 
 parseargs $@
 requireargs gitlab_admin
