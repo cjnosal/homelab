@@ -27,4 +27,19 @@ cp scripts/* /usr/local/bin/
 # trust init/certs/
 gettlsca
 
+# vault CA
+if [[ -f /home/ubuntu/init/creds/ssh_host_role_id && -f /home/ubuntu/init/creds/vault.env ]]
+then
+	source /home/ubuntu/init/creds/vault.env
+	sudo /usr/local/bin/getsshcert --vault ${VAULT_ADDR} --roleid /home/ubuntu/init/creds/ssh_host_role_id
+	sudo /usr/local/bin/getsshclientca --vault ${VAULT_ADDR}
+
+	cat << EOC | sudoappend /etc/ssh/sshd_config.d/ca.conf
+TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
+HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+EOC
+
+	sudo systemctl restart sshd
+fi
+
 popd

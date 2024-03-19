@@ -40,6 +40,8 @@ ssh ubuntu@${nameserver} addhost.sh ${mastervm} $IP
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/kubernetes \
   ubuntu@${mastervm}.${domain}:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@${mastervm}.${domain}:/home/ubuntu/init/certs
+ssh ubuntu@${mastervm}.${domain} mkdir -p /home/ubuntu/init/creds/
+scp -r ./workspace/creds/ssh_host_role_id ./workspace/creds/vault.env ubuntu@${mastervm}.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@${mastervm}.${domain} sudo bash << EOF
 /home/ubuntu/init/kubernetes/runcmd --domain ${domain} --node master --version ${version} --acme ${acme}
 EOF
@@ -63,7 +65,9 @@ do
   scp -r ./workspace/cloudinit/base ./workspace/cloudinit/kubernetes \
     ubuntu@${workervm}.${domain}:/home/ubuntu/init
   scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@${workervm}.${domain}:/home/ubuntu/init/certs
-  ssh ubuntu@${workervm}.${domain} mkdir /home/ubuntu/init/creds/
+  ssh ubuntu@${workervm}.${domain} mkdir -p /home/ubuntu/init/creds/
+  scp -r ./workspace/creds/ssh_host_role_id ./workspace/creds/vault.env ubuntu@${workervm}.${domain}:/home/ubuntu/init/creds/
+  ssh ubuntu@${workervm}.${domain} mkdir -p /home/ubuntu/init/creds/
   scp -r ./workspace/creds/k8s-${cluster}-join-cmd ubuntu@${workervm}.${domain}:/home/ubuntu/init/creds/joincmd
   ssh ubuntu@${workervm}.${domain} sudo bash << EOF
   chmod a+rx /home/ubuntu/init/creds/joincmd

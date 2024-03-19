@@ -62,7 +62,7 @@ EOF
 ./workspace/proxmox/preparevm --vmname vault --skip_userdata
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/vault ubuntu@vault.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@vault.home.arpa:/home/ubuntu/init/certs
-ssh ubuntu@vault.home.arpa mkdir /home/ubuntu/init/creds/
+ssh ubuntu@vault.home.arpa mkdir -p /home/ubuntu/init/creds/
 scp -r ./workspace/creds/vault-client-secret ubuntu@vault.home.arpa:/home/ubuntu/init/creds/
 ssh ubuntu@vault.home.arpa sudo bash << EOF
 /home/ubuntu/init/vault/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
@@ -72,6 +72,7 @@ EOF
 
 curl -kfSsL -o /root/workspace/creds/vault_host_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-host-signer/public_key
 curl -kfSsL -o /root/workspace/creds/vault_client_ssh_ca.pem https://vault.home.arpa:8200/v1/ssh-client-signer/public_key
+scp ubuntu@vault.home.arpa:/usr/local/include/vault.env /root/workspace/creds/vault.env
 
 while ! curl -kfSsL https://step.home.arpa:8443/step_root_ca.crt
 do
@@ -96,14 +97,13 @@ echo $SSH_ROLE_ID > /root/workspace/creds/ssh_host_role_id
 
 for vm in bind step ldap keycloak vault
 do
-  scp -r ./workspace/creds/ssh_host_role_id ubuntu@${vm}.home.arpa:/home/ubuntu/init/creds/
+  scp -r ./workspace/creds/ssh_host_role_id ./workspace/creds/vault.env ubuntu@${vm}.home.arpa:/home/ubuntu/init/creds/
 	ssh ubuntu@${vm}.home.arpa bash << EOF
 set -euo pipefail
 sudo /usr/local/bin/getsshcert --vault https://vault.home.arpa:8200 --roleid /home/ubuntu/init/creds/ssh_host_role_id
 sudo /usr/local/bin/getsshclientca --vault https://vault.home.arpa:8200
-sudo /usr/local/bin/getsshserverca --vault https://vault.home.arpa:8200 --domain home.arpa
 
-cat << EOC | sudoappend /etc/ssh/sshd_config.d/home.arpa.conf
+cat << EOC | sudoappend /etc/ssh/sshd_config.d/ca.conf
 TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
 HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
 EOC
@@ -146,7 +146,8 @@ scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap \
   ubuntu@workstation.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@workstation.home.arpa:/home/ubuntu/init/certs
 scp -r ./workspace/kubernetes ubuntu@workstation.home.arpa:/home/ubuntu/init/kubernetes
-ssh ubuntu@workstation.home.arpa mkdir /home/ubuntu/init/creds/
+ssh ubuntu@workstation.home.arpa mkdir -p /home/ubuntu/init/creds/
+scp -r ./workspace/creds/ssh_host_role_id ./workspace/creds/vault.env ubuntu@workstation.home.arpa:/home/ubuntu/init/creds/
 ssh ubuntu@workstation.home.arpa sudo bash << EOF
 /home/ubuntu/init/workstation/runcmd --domain "home.arpa" --userfile /home/ubuntu/init/user.yml
 EOF
@@ -155,6 +156,8 @@ EOF
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/mail \
   ubuntu@mail.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@mail.home.arpa:/home/ubuntu/init/certs
+ssh ubuntu@mail.home.arpa mkdir -p /home/ubuntu/init/creds/
+scp -r ./workspace/creds/ssh_host_role_id ./workspace/creds/vault.env ubuntu@mail.home.arpa:/home/ubuntu/init/creds/
 ssh ubuntu@mail.home.arpa sudo bash << EOF
 /home/ubuntu/init/mail/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
   --network 192.168.2.0/23 --nameserver 192.168.2.201 --ldap ldaps://ldap.home.arpa
