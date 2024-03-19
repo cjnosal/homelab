@@ -25,7 +25,6 @@ help_gitlab="url of gitlab host"
 source /usr/local/include/argshelper
 parseargs $@
 requireargs domain userfile
-set -x
 
 ldap=${ldap:-ldap.${domain}}
 step=${step:-step.${domain}}
