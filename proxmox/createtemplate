@@ -1,9 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-rm -f jammy-server-cloudimg-amd64.img
-rm -f jammy-server-cloudimg-amd64-4g.img
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-wget --progress=dot:giga https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
-./workspace/proxmox/resizeimg jammy-server-cloudimg-amd64.img jammy-server-cloudimg-amd64-4g.img 4G
-./workspace/proxmox/img2template jammy-cloudinit-4g jammy-server-cloudimg-amd64-4g.img
+OPTIONS=(host node img local_storage lvm_storage)
+
+help_this="create a qemu template from an ubuntu cloud image"
+help_img="url to OS cloud image" #https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+help_host="api hostname or ip"
+help_node="pve node running the task"
+help_local_storage="name of pve storage for ISOs"
+help_lvm_storage="name of pve storage for LVMs"
+
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host node img local_storage lvm_storage
+
+source ${SCRIPT_DIR}/api/auth
+
+IMG_BASE=$(basename $img .img)
+ISO=${IMG_BASE}.iso # proxmox is picky with file extensions
+
+ssh root@${host} bash << EOF
+set -euo pipefail
+if [[ -f /var/lib/vz/template/iso/${IMG_BASE}.iso ]]
+then
+  rm -f /var/lib/vz/template/iso/${IMG_BASE}.iso
+fi
+EOF
+
+UPLOAD_UPID=$(curl -fSsL -X POST -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/storage/${local_storage}/download-url" \
+  -d content=iso \
+  -d filename=$ISO \
+  -d verify-certificates=1 \
+  --data-urlencode url=${img} \
+  | jq -r .data)
+
+${SCRIPT_DIR}/api/waitfortask --task $UPLOAD_UPID
+
+# upload only accepts iso, but import-from only accepts qcow2 from disk storage
+# otherwise only root can shell in and use arbitrary import path
+ssh root@${host} bash << EOF
+set -euo pipefail
+if [[ ! -d /var/lib/vz/images/0 ]]
+then
+  ln -s /var/lib/vz/template/iso /var/lib/vz/images/0
+fi
+if [[ ! -f /var/lib/vz/template/iso/${IMG_BASE}.qcow2 ]]
+then
+  ln -s /var/lib/vz/template/iso/${IMG_BASE}.iso /var/lib/vz/template/iso/${IMG_BASE}.qcow2
+fi
+EOF
+
+${SCRIPT_DIR}/img2template --img $IMG_BASE

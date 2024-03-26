@@ -3,7 +3,7 @@ set -euo pipefail
 
 target=$1
 
-while [[ -z "$(dig -4 $target @bind.home.arpa +noall +answer)" ]]
+while [[ -z "$(dig -4 $target +noall +answer)" ]]
 do
   echo waiting for dns resolution of $target
   sleep 2

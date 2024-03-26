@@ -3,7 +3,7 @@
 Create an open vault server
 
 ## add DNS record
-export IP=$(./workspace/proxmox/ips next)
+export IP=$(./workspace/proxmox/ips --next)
 see cloudinit/bind/README.md (done first because cloudinit includes certbot setup)
 
 ```

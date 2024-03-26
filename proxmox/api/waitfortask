@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+OPTIONS=(host node task)
+
+help_this="wait for a task to complete"
+help_node="name of pve node running the task"
+help_host="api hostname or ip"
+help_task="task id"
+
+source ${SCRIPT_DIR}/../../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host node task
+
+source ${SCRIPT_DIR}/auth
+
+desc=$(cut -d':' -f6-7 <<< ${task})
+
+while true
+do
+  TASK_STATUS=$(curl -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/tasks/${task}/status")
+  if [[ "$(jq -r .data.status <<< $TASK_STATUS)" == "stopped" ]]
+  then
+    break
+  else
+    echo waiting for task ${desc}
+    sleep 5
+  fi
+done
+
+if [[ "$(jq -r .data.exitstatus <<< $TASK_STATUS)" != "OK" ]]
+then
+  echo task ${desc} failed: $TASK_STATUS
+  exit 1
+else
+  echo task ${desc} complete
+fi

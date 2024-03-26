@@ -3,21 +3,42 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-ID=$(${SCRIPT_DIR}/findvm jammy-cloudinit-4g)
+OPTIONS=(host node img local_storage lvm_storage)
+
+help_this="update apt packages in template"
+help_img="name of template" #https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+help_host="api hostname or ip"
+help_node="pve node running the task"
+help_local_storage="name of pve storage for ISOs"
+help_lvm_storage="name of pve storage for LVMs"
+
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host node img local_storage lvm_storage
+
+
+ID=$(${SCRIPT_DIR}/findvm --name ${img})
 if [[ -z "$ID" ]]
 then
-  echo "template jammy-cloudinit-4g not found"
+  echo "template ${img} not found"
   exit 1
 fi
 
-if [[ ! -f jammy-server-cloudimg-amd64-4g.img ]]
+ssh root@${host} bash << EOF
+set -euo pipefail
+
+
+if [[ ! -f /var/lib/vz/template/iso/${img}.qcow2 ]]
 then
-  echo "image jammy-server-cloudimg-amd64-4g.img not found"
+  echo "image /var/lib/vz/template/iso/${img}.qcow2 not found"
   exit 1
 fi
 
-virt-customize -a jammy-server-cloudimg-amd64-4g.img --run-command "apt update -y && apt upgrade -y"
+virt-customize -a /var/lib/vz/template/iso/${img}.qcow2 --run-command "apt update -y && apt upgrade -y"
+virt-customize -a /var/lib/vz/template/iso/${img}.qcow2 --truncate /etc/machine-id
 
 qm destroy $ID
+EOF
 
-${SCRIPT_DIR}/img2template jammy-cloudinit-4g jammy-server-cloudimg-amd64-4g.img
+${SCRIPT_DIR}/img2template --img ${img}

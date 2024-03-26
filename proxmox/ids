@@ -1,28 +1,44 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# default: print ids of all VMs and containers
-# if argument "next" is provided print an ID available for the next VM
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-ID_START=${ID_START:-100}
-ID_END=${ID_END:-500}
+source ${SCRIPT_DIR}/api/auth
 
-CONF_FILES=$(ls /etc/pve/qemu-server ; ls /etc/pve/lxc)
-IDS=( $(sed s'/.conf//g' <<< $CONF_FILES) )
 
-IN_USE=$(echo "${IDS[*]}" | xargs -n1 echo | sort)
+FLAGS=(next)
+OPTIONS=(host start end)
 
-for i in $(seq $ID_START $ID_END)
-do
-	if [[ ! " ${IDS[*]} " =~ " $i " ]]; then
-	    AVAILABLE="${i}"
-	    break
-	fi
-done
+help_this="default: print ids of all VMs
+  if argument "next" is provided print an ID available for the next VM"
+help_host="api hostname or ip"
+help_start="start of id range to search for next available id"
+help_end="end of id range to search for next available id"
 
-if [[ $# -ge 1 && "$1" == "next" ]]
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host
+
+start=${start:-100}
+end=${end:-500}
+
+if [[ "${next}" == "1" ]]
 then
+	for i in $(seq $start $end)
+	do
+		if curl -fsL -H"${auth}" "https://${host}:8006/api2/json/cluster/nextid?vmid=${i}" > /dev/null
+	  then
+	    AVAILABLE=$i
+	    break
+	  fi
+	done
   echo $AVAILABLE
 else
-  echo "$IN_USE"
+	IN_USE=()
+	for node in $(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes | jq -r .data[].node)
+	do
+		IN_USE+=($(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes/${node}/qemu | jq -r .data[].vmid))
+	done
+  echo "${IN_USE[@]}" | xargs -n1 | sort
 fi

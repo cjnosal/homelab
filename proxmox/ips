@@ -1,42 +1,56 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# default: print IP address of all VMs and containers
-# if argument "next" is provided print an IP available for the next VM
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-SUBNET=${SUBNET:-192.168.2}
-HOST_START=${HOST_START:-201}
-HOST_END=${HOST_END:-250}
+source ${SCRIPT_DIR}/api/auth
+
+
+FLAGS=(next)
+OPTIONS=(host start end subnet)
+
+help_this="default: print IP address of all VMs
+  if argument "next" is provided print an IP available for the next VM"
+help_host="api hostname or ip"
+help_subnet="/24 prefix of ipv4 address"
+help_start="start of id range to search for next available id"
+help_end="end of id range to search for next available id"
+
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host
+
+start=${start:-201}
+end=${end:-250}
+
 
 IPLIST=()
-for conf in $(ls /etc/pve/qemu-server/)
+for node in $(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes | jq -r .data[].node)
 do
-  vm=/etc/pve/qemu-server/$conf
-  ipconfig=$(grep ipconfig0 $vm | cut -d':' -f2-)
-  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
-  IPLIST+=("$ip")
-done
-
-for conf in $(ls /etc/pve/lxc/)
-do
-  lxc=/etc/pve/lxc/$conf
-  ipconfig=$(grep net0 $lxc | cut -d':' -f2-)
-  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
-  IPLIST+=("$ip")
+  for vm in $(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes/${node}/qemu | jq -r .data[].vmid)
+  do
+    ipconfig=$(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes/${node}/qemu/${vm}/config | jq -r .data.ipconfig0)
+    ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+    IPLIST+=("$ip")
+  done
 done
 
 IN_USE=$(echo "${IPLIST[*]}" | xargs -n1 echo | sort)
 
-for i in $(seq $HOST_START $HOST_END)
-do
-	if [[ ! " ${IPLIST[*]} " =~ " ${SUBNET}.${i} " ]]; then
-	    AVAILABLE="${SUBNET}.${i}"
-	    break
-	fi
-done
 
-if [[ $# -ge 1 && "$1" == "next" ]]
+
+if [[ "${next}" == "1" ]]
 then
+  requireargs subnet
+  subnet=$(cut -d'.' -f1-3 <<< $subnet)
+  for i in $(seq $start $end)
+  do
+    if [[ ! " ${IPLIST[*]} " =~ " ${subnet}.${i} " ]]; then
+        AVAILABLE="${subnet}.${i}"
+        break
+    fi
+  done
   echo $AVAILABLE
 else
   echo "$IN_USE"

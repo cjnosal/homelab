@@ -4,7 +4,7 @@ A VM for user interaction with deployed services
 Provisions a user and comes with required client tools in the lubuntu desktop environment
 
 ```
-export IP=$(./workspace/proxmox/ips next)
+export IP=$(./workspace/proxmox/ips --next)
 ./workspace/cloudinit/workstation/generate.sh $username $displayname
 ./workspace/proxmox/newvm --vmname workstation --userdata workstation.yml --disk 32 --memory 8192 --cores 4 --ip $IP
 ```

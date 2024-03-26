@@ -1,41 +1,37 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# print the hostname and IP address of all VMs and containers
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-for conf in $(ls /etc/pve/qemu-server/)
+source ${SCRIPT_DIR}/api/auth
+
+
+OPTIONS=(host)
+
+help_this="print the hostname and IP address of all VMs"
+help_host="api hostname or ip"
+
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
+
+parseargs $@
+requireargs host
+
+for node in $(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes | jq -r .data[].node)
 do
-  vm=/etc/pve/qemu-server/$conf
-  if grep -q "template: 1" $vm
-  then
-    continue
-  fi
-  ipconfig=$(grep ipconfig0 $vm | cut -d':' -f2-)
-  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
-  if [[ -z "$ip " ]]
-  then
-    continue
-  fi
-  name=$(grep "^name:" $vm | awk '{print $2}')
-
-  echo $name $ip
-
-done
-
-for conf in $(ls /etc/pve/lxc/)
-do
-  lxc=/etc/pve/lxc/$conf
-  if grep -q "template: 1" $lxc
-  then
-    continue
-  fi
-  ipconfig=$(grep net0 $lxc | cut -d':' -f2-)
-  ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
-  if [[ -z "$ip " ]]
-  then
-    continue
-  fi
-  name=$(grep "^hostname:" $lxc | awk '{print $2}')
-
-  echo $name $ip
+  for vm in $(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes/${node}/qemu | jq -r .data[].vmid)
+  do
+    config=$(curl -fsL -H"${auth}" https://${host}:8006/api2/json/nodes/${node}/qemu/${vm}/config | jq -r .data)
+    if [[ "$(jq -r .template <<< $config)" == "1" ]]
+    then
+      continue
+    fi
+    ipconfig=$(jq -r .ipconfig0 <<< $config)
+    name=$(jq -r .name <<< $config)
+    ip=$(sed -nr 's:.*ip=(.*)/.*:\1:p' <<< $ipconfig)
+    if [[ -z "${ip}" ]]
+    then
+      continue
+    fi
+    echo $name $ip
+  done
 done

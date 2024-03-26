@@ -1,0 +1,19 @@
+if [[ ! -f ~/.pve/auth ]]
+then
+	if [[ -z "${USERNAME:-}" ]]
+	then
+	  echo "pve user: (include @realm!tokenname)"
+	  read USERNAME
+	fi
+
+	if [[ -z "${ACCESS_TOKEN:-}" ]]
+	then
+	  echo "pve access token:"
+	  read -s ACCESS_TOKEN
+	fi
+
+	mkdir -p ~/.pve
+	echo "Authorization: PVEAPIToken=${USERNAME}=${ACCESS_TOKEN}" > ~/.pve/auth
+fi
+
+export auth="$(cat ~/.pve/auth)"

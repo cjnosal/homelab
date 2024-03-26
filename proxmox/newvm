@@ -8,67 +8,111 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 # defaults
 memory=${memory:-4096}
 cores=${cores:-2}
-nameserver=${nameserver:-$(dig -4 +noall +answer bind.home.arpa | awk '{print $5}')}
-template_name=${template_name:-"jammy-cloudinit-4g"}
+disk=${disk:-4}
 
-OPTIONS=(template_name vmname userdata memory cores disk nameserver ip)
+OPTIONS=(template_name vmname memory cores disk nameserver ip host domain gateway subnet sshpubkey sshprivkey lvm_storage node)
 
 help_this="create a new vm"
-help_template_name="name of the VM template to clone (default jammy-cloudinit-4g)"
+help_template_name="name of the VM template to clone"
 help_vmname="unique name for the new VM"
-help_userdata="filename of the cloudinit user data configuration in the proxmox snippets directory"
 help_memory="RAM to allocate in MB (default 4096)"
 help_cores="CPU cores to allocate (default 2)"
-help_disk="boot disk size in GB (default matches template)"
-help_nameserver="IP address of DNS resolver (default bind.home.arpa)"
-help_ip="IP address of new VM (default will reuse address of {vmname}.home.arpa if present in DNS, otherwise increment available IP)"
+help_disk="boot disk size in GB (default 4)"
+help_nameserver="IP address of DNS resolver"
+help_ip="IP address of new VM (default will reuse address of {vmname}.{domain} if present in DNS, otherwise increment available IP)"
+help_domain="parent domain of this environment"
+help_gateway="network gateway"
+help_subnet="/24 prefix of ipv4 address"
+help_host="hostname or ip of proxmox node"
+help_node="name of proxmox node"
+help_sshpubkey="file path containing ssh public key to access vms"
+help_sshprivkey="file path containing ssh private key to access vms"
+help_lvm_storage="name of pve storage for LVMs"
 
 source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
 parseargs $@
-requireargs template_name vmname
+requireargs template_name vmname nameserver host domain gateway subnet sshpubkey sshprivkey lvm_storage node
 
+source ${SCRIPT_DIR}/api/auth
 
-TEMPLATE_ID=$($SCRIPT_DIR/findvm $template_name)
-VMID=$($SCRIPT_DIR/ids next)
+cidr_mask=$(cut -d'/' -f2 <<< $subnet)
+
+TEMPLATE_ID=$($SCRIPT_DIR/findvm --name $template_name)
+VMID=$($SCRIPT_DIR/ids --next)
 
 if [[ -z "$ip" ]]
 then
-	DNS=$(dig -4 ${vmname}.home.arpa +noall +answer)
+	DNS=$(dig -4 ${vmname}.${domain} +noall +answer)
 	if [[ -n "$DNS" ]]
 	then
 		ip=$(awk '{print $5}' <<< "$DNS") # reuse ip when recreating a VM
 	else
-		ip=$($SCRIPT_DIR/ips next) # find available IP address for new VM
+		ip=$($SCRIPT_DIR/ips --next) # find available IP address for new VM
 	fi
 fi
 
-qm clone $TEMPLATE_ID $VMID --name $vmname
-qm set $VMID --ipconfig0 ip=${ip}/23,gw=192.168.3.1
+CLONE_TASK=$(curl -X POST -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu/${TEMPLATE_ID}/clone" \
+  -d name=${vmname} \
+  -d node=${node} \
+  -d vmid=${TEMPLATE_ID} \
+  -d newid=${VMID} \
+  -d full=1 \
+  | jq -r .data)
 
-qm set $VMID --cpu host
-qm set $VMID --cores $cores
-qm set $VMID --memory $memory
+${SCRIPT_DIR}/api/waitfortask --task $CLONE_TASK
 
-qm set $VMID --searchdomain home.arpa
-qm set $VMID --nameserver ${nameserver}
+rawurlencode() {
+  local string="$(cat -)"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
 
-if [[ -n "$userdata" ]]
-then
-    qm set $VMID --cicustom "user=local:snippets/${userdata}" # use provided cloudinit config
-else
-	qm set $VMID --sshkey /root/.ssh/vm.pub # always add default ssh key
-fi
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+     c=${string:$pos:1}
+     case "$c" in
+        [-_.~a-zA-Z0-9] ) o="${c}" ;;
+        * )               printf -v o '%%%02x' "'$c"
+     esac
+     encoded+="${o}"
+  done
+  echo "${encoded}"
+}
+encoded_key=$(rawurlencode < $sshpubkey)
+
+curl -X PUT -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu/${VMID}/config" \
+  -d vmid=${VMID} \
+  -d node=${node} \
+  --data-urlencode tpmstate0=${lvm_storage}:1,version=v2.0 \
+  --data-urlencode ipconfig0=ip=${ip}/${cidr_mask},gw=${gateway} \
+  -d nameserver=${nameserver} \
+  -d searchdomain=${domain} \
+  -d cores=${cores} \
+  -d memory=${memory} \
+  --data-urlencode sshkeys="${encoded_key}" > /dev/null
 
 if [[ -n "$disk" ]]
 then
-	qm disk resize $VMID scsi0 ${disk}G
+	RESIZE_TASK=$(curl -X PUT -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu/${VMID}/resize" \
+	  -d vmid=${VMID} \
+	  -d node=${node} \
+	  -d disk=scsi0 \
+	  -d size=${disk}G \
+  | jq -r .data)
+  ${SCRIPT_DIR}/api/waitfortask --task $RESIZE_TASK
 fi
 
-qm start $VMID
+
+## start vm
+
+START_TASK=$(curl -X POST -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu/${VMID}/status/start" \
+  -d vmid=${VMID} \
+  -d node=${node} \
+  | jq -r .data)
+${SCRIPT_DIR}/api/waitfortask --task $START_TASK
 
 ssh-keygen -f ~/.ssh/known_hosts -R $ip
-ssh-keygen -f ~/.ssh/known_hosts -R ${vmname}.home.arpa
+ssh-keygen -f ~/.ssh/known_hosts -R ${vmname}.${domain}
 
 while ! ssh-keyscan -H $ip >> ~/.ssh/known_hosts
 do
@@ -76,12 +120,24 @@ do
   sleep 2
 done
 
-ssh -i /root/.ssh/vm ubuntu@${ip} tail -f /var/log/cloud-init-output.log &
+ssh -i ${sshprivkey} ubuntu@${ip} tail -f /var/log/cloud-init-output.log &
 RESULT=0
-if ! ssh -i /root/.ssh/vm ubuntu@${ip} cloud-init status --wait > /dev/null
+if ! ssh -i ${sshprivkey} ubuntu@${ip} cloud-init status --wait > /dev/null
 then
   echo "cloudinit failed"
   RESULT=1
 fi
 kill $(jobs -p)
-exit $RESULT
+if [[ "${RESULT}" == "1" ]]
+then
+  exit $RESULT
+fi
+
+ssh -i ${sshprivkey} ubuntu@${ip} << EOF
+set -euo pipefail
+sudo apt-get install qemu-guest-agent -y
+sudo systemctl start qemu-guest-agent
+mkdir -p /home/ubuntu/init
+mkdir -p /home/ubuntu/init/certs
+mkdir -p /home/ubuntu/init/creds
+EOF

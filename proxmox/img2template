@@ -1,29 +1,44 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# create a qemu template from an ubuntu cloud image
-
-NAME=$1
-IMG=$2 #wget --progress=dot:giga https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
-
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-VMID=$(ID_START=9000 ID_END=9500 $SCRIPT_DIR/ids next)
+OPTIONS=(host node img local_storage lvm_storage)
 
-virt-customize -a $IMG  --install qemu-guest-agent
+help_this="create a qemu template from an ubuntu cloud image"
+help_img="base name of qcow2 image" # jammy-server-cloudimg-amd64
+help_host="api hostname or ip"
+help_node="pve node running the task"
+help_local_storage="name of pve storage for ISOs"
+help_lvm_storage="name of pve storage for LVMs"
 
-if [[ -f ${SCRIPT_DIR}/../creds/ssh_host_role_id ]]
-then
-	virt-customize -a $IMG --write /etc/ssh_host_role_id:$(cat ${SCRIPT_DIR}/../creds/ssh_host_role_id)
-fi
+source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
-virt-customize -a $IMG --truncate /etc/machine-id
+parseargs $@
+requireargs host node img local_storage lvm_storage
 
-qm create $VMID --name $NAME --memory 4096  --cores 2 --net0 virtio,bridge=vmbr0
-qm importdisk $VMID $IMG local-lvm
-qm set $VMID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-$VMID-disk-0
-qm set $VMID --boot c --bootdisk scsi0
-qm set $VMID --ide2 local-lvm:cloudinit
-qm set $VMID --serial0 socket --vga serial0
-qm set $VMID --agent enabled=1
-qm template $VMID
+source ${SCRIPT_DIR}/api/auth
+
+VMID=$($SCRIPT_DIR/ids --next --start 9000 --end 9500)
+
+TASK_ID=$(curl -X POST -fSsL -H"${auth}" "https://${host}:8006/api2/json/nodes/${node}/qemu" \
+  -d name=${img} \
+  -d node=${node} \
+  -d vmid=${VMID} \
+  -d agent=1 \
+  -d cdrom=${lvm_storage}:cloudinit \
+  -d citype=nocloud \
+  -d cores=2 \
+  -d cpu=host \
+  -d memory=4096 \
+  -d ostype=l26 \
+  -d scsihw=virtio-scsi-pci \
+  -d serial0=socket \
+  -d storage=${lvm_storage} \
+  -d vga=serial0 \
+  -d template=1 \
+  --data-urlencode net0=virtio,bridge=vmbr0 \
+  --data-urlencode scsi0=${lvm_storage}:0,import-from=${local_storage}:0/${img}.qcow2,format=qcow2 \
+  --data-urlencode boot=order=scsi0 \
+  | jq -r .data)
+${SCRIPT_DIR}/api/waitfortask --task $TASK_ID
