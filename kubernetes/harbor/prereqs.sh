@@ -18,6 +18,8 @@ help_all="configure all prerequisites"
 help_harbor_admin="initial member of harbor admin group"
 
 source /usr/local/include/argshelper
+source /usr/local/include/ldap.env
+source /usr/local/include/ldapauthhelper
 
 parseargs $@
 
@@ -43,7 +45,7 @@ fi
 
 if [[ "$keycloak" == "1" ]]
 then
-    ${SCRIPT_DIR}/prereqs/keycloak-sync.sh
+    sync-realm --username ${LDAP_BIND_UID} --password ${LDAP_BIND_PW}
 fi
 
 if [[ "$dns" == "1" ]]

@@ -17,6 +17,8 @@ help_all="configure all prerequisites"
 help_gitlab_admin="initial member of gitlab admin group"
 
 source /usr/local/include/argshelper
+source /usr/local/include/ldap.env
+source /usr/local/include/ldapauthhelper
 
 parseargs $@
 
@@ -24,7 +26,6 @@ if [[ "$all" == "1" ]]
 then
     ldap=1
     keycloak=1
-    # dns=1
     vault=1
     kubernetes=1
 fi
@@ -42,7 +43,7 @@ fi
 
 if [[ "$keycloak" == "1" ]]
 then
-    ${SCRIPT_DIR}/prereqs/keycloak-sync.sh
+    sync-realm --username ${LDAP_BIND_UID} --password ${LDAP_BIND_PW}
 fi
 
 if [[ "$kubernetes" == "1" ]]

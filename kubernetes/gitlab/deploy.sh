@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
-
-export VAULT_ADDR=https://vault.home.arpa:8200
-vault login -no-print -method=ldap role=gitlab-admin
-
-kubectl config use-context core-user@core-pinniped
+source /usr/local/include/vault.env
+source /usr/local/include/ldap.env
+source /usr/local/include/ldapauthhelper
+vault login -no-print -method=ldap role=gitlab-admin username=${LDAP_BIND_UID} password=${LDAP_BIND_PW}
 
 # PVC is retained when reinstalling
 DB_CRED=$(vault read -field password infrastructure/gitlab/db || generatecred)

@@ -10,49 +10,29 @@ help_gitlab_admin="LDAP user to add to the new gitlab-admin group"
 
 source /usr/local/include/argshelper
 source /usr/local/include/ldap.env
+source /usr/local/include/vault.env
 
 parseargs $@
 requireargs gitlab_admin
 
-AUTH_ARGS="-x"
-if [[ -z "${LDAP_BIND_DN:-}" ]]
-then
-	echo "bind uid:"
-	read BIND_USER_UID
-	export LDAP_BIND_DN=$(ldapsearch -H ldaps://ldap.home.arpa -x "(uid=${BIND_USER_UID})" dn | grep dn: | awk '{print $2}')
-fi
-AUTH_ARGS="$AUTH_ARGS -D $LDAP_BIND_DN"
+source /usr/local/include/ldapauthhelper
 
-if [[ -z "${LDAP_BIND_PW:-}" ]]
-then
-  echo "password:"
-  read -s LDAP_BIND_PW
-  export LDAP_BIND_PW
-fi
-AUTH_ARGS="$AUTH_ARGS -w $LDAP_BIND_PW"
-
-
-function generatecred {
-  (tr -dc A-Za-z0-9 </dev/urandom || [[ $(kill -L $?) == PIPE ]]) | head -c 16
-}
-export -f generatecred
 GITLAB_LDAP_CRED=$(generatecred)
 
 # gitlab system account to search ldap users
-if ! ldapsearch -x "(uid=gitlab)" | grep 'uid=gitlab,ou=Systems,dc=home,dc=arpa'
+if ! ldapsearch -x "(uid=gitlab)" | grep "uid=gitlab,ou=Systems,${SUFFIX}"
 then
   addldapsystem gitlab Gitlab
 fi
 
-ldappasswd $AUTH_ARGS -s $GITLAB_LDAP_CRED -S uid=gitlab,ou=systems,dc=home,dc=arpa
+ldappasswd $AUTH_ARGS -s $GITLAB_LDAP_CRED -S uid=gitlab,ou=Systems,${SUFFIX}
 
-export VAULT_ADDR=https://vault.home.arpa:8200
-echo "login to vault as ldap-admin"
-vault login -no-print -method=ldap role=ldap-admin
+echo "login to vault with ldap-admin role"
+vault login -no-print -method=ldap role=ldap-admin username=${LDAP_BIND_UID} password=${LDAP_BIND_PW}
 vault write infrastructure/ldap/gitlab uid=gitlab password=${GITLAB_LDAP_CRED}
 
 # gitlab-admin group for the gitlab admin role
-if ! ldapsearch -x "(cn=gitlab-admin)" | grep 'cn=gitlab-admin,ou=Groups,dc=home,dc=arpa'
+if ! ldapsearch -x "(cn=gitlab-admin)" | grep "cn=gitlab-admin,ou=Groups,${SUFFIX}"
 then
   addldapgroup gitlab-admin
 fi
@@ -63,7 +43,7 @@ then
 fi
 
 # k8s-gitlab-admin group for access to the deployment namespace
-if ! ldapsearch -x "(cn=k8s-gitlab-admin)" | grep 'cn=k8s-gitlab-admin,ou=Groups,dc=home,dc=arpa'
+if ! ldapsearch -x "(cn=k8s-gitlab-admin)" | grep "cn=k8s-gitlab-admin,ou=Groups,${SUFFIX}"
 then
   addldapgroup k8s-gitlab-admin
 fi
