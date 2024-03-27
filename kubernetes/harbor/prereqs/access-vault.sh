@@ -4,8 +4,10 @@ set -euo pipefail
 # As a Vault administrator, set up a vault path to be shared
 # between the LDAP admins and the Harbor service account
 
-export VAULT_ADDR=https://vault.home.arpa:8200
-vault login -no-print -method=oidc role=vault-admin
+source /usr/local/include/vault.env
+source /usr/local/include/ldap.env
+source /usr/local/include/ldapauthhelper
+vault login -no-print -method=ldap role=ldap-admin username=${LDAP_BIND_UID} password=${LDAP_BIND_PW}
 
 # service account can read harbor's ldap password
 enable-k8s-auth.sh --cluster core --url https://k8s-core-master.home.arpa:6443
