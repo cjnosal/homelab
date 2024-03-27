@@ -32,7 +32,7 @@ then
   wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 fi
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-apt-get update && apt-get install -y vault gpg
+apt-get update && apt-get install -y vault=1.15.6-1 gpg
 
 # user
 if ! id -u vault
