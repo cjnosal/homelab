@@ -1,10 +1,10 @@
 # Cloudinit
 
-Use Carvel `ytt` to generate Cloudinit user data files from a common base and VM-specific parameters
+VM setup scripts
 
 ## Usage
 
-1. Upload the `cloudinit` and `proxmox` directories to the Proxmox node
-   `scp -i ~/.ssh/pve -r ./cloudinit ./proxmox root@pve.home.arpa:/root/workspace/`
-2. Configure and run the generate.sh scripts in the subdirectories to create cloudinit user data configuration files
-3. Run `proxmox/newvm` referencing the appropriate cloudinit configuration
+1. Upload the `base` and VM-specific directories to the VM under /home/ubuntu/init
+2. Upload the step CA to the VM under /home/ubuntu/init/certs
+3. Upload the required credentials to the VM under /home/ubuntu/init/creds
+4. Configure and run VM's `runcmd` script
