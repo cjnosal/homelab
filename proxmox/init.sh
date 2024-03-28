@@ -174,7 +174,7 @@ step ca provisioner update keycloak --admin=step-provisioner-admin  $CONFIG
 sudo systemctl restart step-ca
 EOF
 
-${SCRIPT_DIR}/preparevm --vmname workstation -- --cores 4 --memory 8192 --disk 32
+${SCRIPT_DIR}/preparevm --vmname workstation -- --cores 4 --memory 16384 --disk 32
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
   ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
   ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../cloudinit/user.yml \
@@ -187,7 +187,7 @@ ssh ubuntu@workstation.${domain} sudo bash << EOF
 /home/ubuntu/init/workstation/runcmd --domain "${domain}" --userfile /home/ubuntu/init/user.yml
 EOF
 
-${SCRIPT_DIR}/preparevm --vmname mail -- --disk 8
+${SCRIPT_DIR}/preparevm --vmname mail -- --disk 8 --memory 8192
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/mail \
   ubuntu@mail.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@mail.${domain}:/home/ubuntu/init/certs
