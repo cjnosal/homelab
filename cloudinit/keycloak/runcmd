@@ -121,6 +121,9 @@ done
 GROUP_ID=$(/opt/keycloak/bin/kcadm.sh get groups -r infrastructure -q search=keycloak-realm-admin | jq -r .[0].id)
 /opt/keycloak/bin/kcadm.sh add-roles -r infrastructure --gid $GROUP_ID --cclientid realm-management --rolename realm-admin
 
+BOOTSTRAP=$(/opt/keycloak/bin/kcadm.sh get users -r infrastructure -q username=bootstrap | jq -r '.[0].id')
+/opt/keycloak/bin/kcadm.sh update users/${BOOTSTRAP} -r infrastructure -s 'emailVerified=true'
+
 popd
 
 echo success

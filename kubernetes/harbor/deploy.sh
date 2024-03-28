@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
 source /usr/local/include/vault.env
 source /usr/local/include/ldap.env
 source /usr/local/include/ldapauthhelper
@@ -18,7 +20,7 @@ HT_REG_CRED=$(htpasswd -nbB harbor_registry_user $REG_CRED)
 
 PRIVATE_KEY=$(openssl genrsa -traditional 4096)
 
-ytt -f secrets.yml \
+ytt -f ${SCRIPT_DIR}/secrets.yml \
   -v admin_password="${ADMIN_CRED}" \
   -v secret_key="${SECRET_KEY}" \
   -v registry_login.password="${REG_CRED}" \
@@ -46,7 +48,7 @@ kubectl wait -n harbor --timeout=3m --for=condition=ready=true certificate harbo
 helm repo add harbor https://helm.goharbor.io
 
 helm upgrade --install harbor harbor/harbor --namespace harbor  --wait \
-  --values values.yml \
+  --values ${SCRIPT_DIR}/values.yml \
   --set-string database.internal.password=${DB_CRED}
 
 # wait for external-dns

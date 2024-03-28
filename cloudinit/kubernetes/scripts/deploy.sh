@@ -457,8 +457,61 @@ roleRef:
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
 EOF
+cat <<EOF | kubectl apply -f -
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: bootstrap-admin
+subjects:
+- kind: User
+  name: bootstrap
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+EOF
 
 echo "stopping csr approver"
 kill $(jobs -p)
+
+openssl genrsa -out /home/ubuntu/init/creds/bootstrap.pem
+openssl req -new -key /home/ubuntu/init/creds/bootstrap.pem -out /home/ubuntu/init/creds/bootstrap.csr -subj "/CN=bootstrap/O=bootstrap"
+
+cat <<EOF > /home/ubuntu/init/creds/bootstrap-csr.yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: user-request-bootstrap
+spec:
+  groups:
+  - system:authenticated
+  request: $(base64 -w 0 < /home/ubuntu/init/creds/bootstrap.csr)
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 7200
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+EOF
+kubectl create -f /home/ubuntu/init/creds/bootstrap-csr.yaml
+kubectl certificate approve user-request-bootstrap
+kubectl wait --timeout=3m --for=jsonpath='{.status.certificate}' csr user-request-bootstrap
+
+kubectl get csr user-request-bootstrap -o jsonpath='{.status.certificate}' | base64 -d > /home/ubuntu/init/creds/bootstrap-user.crt
+
+server=$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}')
+kubectl --kubeconfig /home/ubuntu/init/creds/bootstrap-config.yml config set-cluster ${cluster} \
+  --embed-certs=true --server=$server --certificate-authority=/etc/kubernetes/pki/ca.crt
+kubectl --kubeconfig /home/ubuntu/init/creds/bootstrap-config.yml config set-credentials bootstrap \
+  --client-certificate=/home/ubuntu/init/creds/bootstrap-user.crt \
+  --client-key=/home/ubuntu/init/creds/bootstrap.pem \
+  --embed-certs=true
+kubectl --kubeconfig /home/ubuntu/init/creds/bootstrap-config.yml config set-context default \
+  --cluster=${cluster} --user=bootstrap
+kubectl --kubeconfig /home/ubuntu/init/creds/bootstrap-config.yml config use-context default
+
+chown ubuntu /home/ubuntu/init/creds/bootstrap-config.yml
 
 echo "deploy.sh complete"

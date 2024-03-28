@@ -88,6 +88,12 @@ ssh ubuntu@ldap.${domain} sudo bash << EOF
 /home/ubuntu/init/ldap/runcmd --domain "${domain}" --acme "https://step.${domain}/acme/acme/directory" \
   --userfile /home/ubuntu/init/user.yml
 EOF
+BOOTSTRAP_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/bootstrap.passwd
+sudo rm /root/bootstrap.passwd
+EOF
+)
+echo $BOOTSTRAP_PASSWORD > ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd
 
 ${SCRIPT_DIR}/preparevm --vmname keycloak -- --disk 8
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/keycloak ubuntu@keycloak.${domain}:/home/ubuntu/init
@@ -187,7 +193,7 @@ scp -r ./kubernetes ubuntu@workstation.${domain}:/home/ubuntu/init/kubernetes
 ssh ubuntu@workstation.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@workstation.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@workstation.${domain} sudo bash << EOF
-/home/ubuntu/init/workstation/runcmd --domain "${domain}" --userfile /home/ubuntu/init/user.yml
+/home/ubuntu/init/workstation/runcmd --domain "${domain}" --userfile /home/ubuntu/init/user.yml --desktop
 EOF
 
 ${SCRIPT_DIR}/preparevm --vmname mail -- --disk 8 --memory 8192
@@ -253,12 +259,48 @@ ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addr
   --client_id pinniped --keycloak https://keycloak.${domain}:8443 --supervisor \
   --version v1.28
 
+scp ubuntu@k8s-core-master.${domain}:/home/ubuntu/init/creds/bootstrap-config.yml ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml
+
 ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "${run_lb_range}" --workers 2 --subdomain apps \
   --acme https://step.${domain}/acme/acme/directory --domain ${domain} --nameserver ${nameserver} \
   --pinniped pinniped.eng.${domain} --vault https://vault.${domain}:8200 \
   --cert_manager_tsig_name k8s-run-cert-manager --external_dns_tsig_name k8s-run-external-dns \
   --version v1.28
 
+${SCRIPT_DIR}/preparevm --vmname bootstrap -- --disk 8
+scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
+  ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
+  ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../kubernetes \
+  ${SCRIPT_DIR}/../cloudinit/user.yml \
+  ubuntu@bootstrap.${domain}:/home/ubuntu/init
+scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@bootstrap.${domain}:/home/ubuntu/init/certs
+scp -r ./kubernetes ubuntu@bootstrap.${domain}:/home/ubuntu/init/kubernetes
+ssh ubuntu@bootstrap.${domain} mkdir -p /home/ubuntu/init/creds/
+scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+ssh ubuntu@bootstrap.${domain} sudo bash << EOF
+/home/ubuntu/init/workstation/runcmd --domain "${domain}"
+
+export LDAP_BIND_UID="bootstrap"
+export LDAP_BIND_PW="\$(cat /home/ubuntu/init/creds/ldap_bootstrap.passwd)"
+export KUBECONFIG=/home/ubuntu/init/creds/k8s-core-bootstrap-config.yml
+
+user=\$(yq .username /home/ubuntu/init/user.yml)
+
+/home/ubuntu/init/kubernetes/gitlab/prereqs.sh -all --gitlab_admin \${user}
+/home/ubuntu/init/kubernetes/gitlab/deploy.sh
+
+# ssh cert needed to update dns configuration
+ssh-keygen -t rsa -f ~/.ssh/id_rsa -C bootstrap@${domain} -N ""
+
+/home/ubuntu/init/kubernetes/harbor/prereqs.sh -all --harbor_admin \${user}
+/home/ubuntu/init/kubernetes/harbor/deploy.sh
+
+# randomize the bootstrap user's ldap password (another admin can reset it if the account is needed later)
+source /usr/local/include/ldap.env
+ldappasswd -x -D uid=bootstrap,ou=people,\${SUFFIX} -w \${LDAP_BIND_PW} -s \$(generatecred) -S uid=bootstrap,ou=people,\${SUFFIX} -H ldaps://\${HOST}
+rm /home/ubuntu/init/creds/ldap_bootstrap.passwd
+EOF
 
 ## sync dns journal to config
 ssh ubuntu@bind.${domain} bash << EOF
