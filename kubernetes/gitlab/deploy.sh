@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
 source /usr/local/include/vault.env
 source /usr/local/include/ldap.env
 source /usr/local/include/ldapauthhelper
@@ -21,7 +23,7 @@ ADMIN_CRED=$(generatecred)
 MINIO_ACCESS_CRED=$(generatecred)
 MINIO_SECRET_CRED=$(generatecred)
 
-ytt -f secrets.yml \
+ytt -f ${SCRIPT_DIR}/secrets.yml \
   -v root_password="${ADMIN_CRED}" \
   -v db_password="${DB_CRED}" \
   -v redis_secret="${REDIS_CRED}" \
@@ -94,7 +96,7 @@ kubectl wait -n gitlab vaultstaticsecret ldap-password --for=jsonpath='{.status.
 helm repo add gitlab https://charts.gitlab.io/
 
 helm upgrade --install -n gitlab gitlab gitlab/gitlab --wait \
-  --values values.yml
+  --values ${SCRIPT_DIR}/values.yml
 
 # wait for external-dns
 while [[ -z "$(dig -4 gitlab.eng.home.arpa @bind.home.arpa +noall +answer)" ]]

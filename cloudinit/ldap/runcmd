@@ -55,6 +55,15 @@ else
   admincred=$(cat /root/ldap_admin.passwd)
 fi
 
+if [[ ! -f /root/bootstrap.passwd ]]
+then
+  bootstrapcred=$(generatecred)
+  echo $bootstrapcred > /root/bootstrap.passwd
+  chmod 400 /root/bootstrap.passwd
+else
+  bootstrapcred=$(cat /root/bootstrap.passwd)
+fi
+
 if [[ ! -f /root/user.passwd ]]
 then
   password=$(generatecred)
@@ -122,6 +131,7 @@ givenname=$(yq .givenname $userfile)
 surname=$(yq .surname $userfile)
 email=$(yq .email $userfile)
 
+addldapuser bootstrap Boot Strap bootstrap@${domain}
 addldapuser $username $givenname $surname $email
 
 # mail
@@ -133,17 +143,21 @@ addldapuser catchall Catch All catchall@${domain}
 addldapuser mailbot Mail Bot mailbot@${domain}
 
 # first user is admin of all components
-addldapusertogroup $username keycloak-realm-admin
-addldapusertogroup $username step-admin
-addldapusertogroup $username step-provisioner-admin
-addldapusertogroup $username vault-user
-addldapusertogroup $username vault-admin
-addldapusertogroup $username ssh-ops
-addldapusertogroup $username dns-ops
-addldapusertogroup $username ldap-admin
-addldapusertogroup $username k8s-core-admin
-addldapusertogroup $username k8s-run-admin
+for admin in bootstrap $username
+do
+  addldapusertogroup $admin keycloak-realm-admin
+  addldapusertogroup $admin step-admin
+  addldapusertogroup $admin step-provisioner-admin
+  addldapusertogroup $admin vault-user
+  addldapusertogroup $admin vault-admin
+  addldapusertogroup $admin ssh-ops
+  addldapusertogroup $admin dns-ops
+  addldapusertogroup $admin ldap-admin
+  addldapusertogroup $admin k8s-core-admin
+  addldapusertogroup $admin k8s-run-admin
+done
 
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $bootstrapcred -S uid=bootstrap,ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $password -S uid=${username},ou=people,${suffix}
 
 popd

@@ -4,18 +4,20 @@ set -euo pipefail
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
 FLAGS=(skip_domain)
-OPTIONS=(vmname nameserver domain)
+OPTIONS=(host subnet vmname nameserver domain)
 
 help_this="create a new vm with automatic ip and dns. passthrough args to newvm"
 help_skip_domain="do not add DNS records for this host"
 help_vmname="unique name for the new VM"
 help_nameserver="authorative name server to register the host with"
 help_domain="parent domain of this environment"
+help_host="api hostname or ip"
+help_subnet="/24 prefix of ipv4 address"
 
 source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
 
 parseargs "$@"
-requireargs vmname nameserver
+requireargs vmname nameserver host subnet
 
 
 echo set up ${vmname}

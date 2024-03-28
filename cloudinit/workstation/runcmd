@@ -5,6 +5,7 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
+FLAGS=(desktop)
 OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step)
 
 help_this="initialize workstation"
@@ -18,13 +19,19 @@ help_keycloak="url of keycloak host"
 help_vault="url of vault host"
 help_harbor="url of harbor host"
 help_gitlab="url of gitlab host"
+help_desktop="install desktop environment"
 
 
 ../base/runcmd
 
 source /usr/local/include/argshelper
 parseargs $@
-requireargs domain userfile
+requireargs domain
+
+if [[ "${desktop}" == "1" ]]
+then
+  requireargs userfile
+fi
 
 ldap=${ldap:-ldap.${domain}}
 step=${step:-step.${domain}}
@@ -76,14 +83,18 @@ DOMAIN=${domain}
 LDAP_HOST=${ldap}
 EOF
 
-cp conf/.xscreensaver /etc/skel/
-mkdir -p /usr/lib/thunderbird/distribution
-cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
+
 cp conf/nsswitch.conf /etc/nsswitch.conf
 
-mkdir -p /etc/firefox/policies
-sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  \
-  conf/firefox-policies.json > /etc/firefox/policies/policies.json
+if [[ "${desktop}" == "1" ]]
+then
+  cp conf/.xscreensaver /etc/skel/
+  mkdir -p /usr/lib/thunderbird/distribution
+  cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
+  mkdir -p /etc/firefox/policies
+  sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  \
+    conf/firefox-policies.json > /etc/firefox/policies/policies.json
+fi
 
 # scripts
 sed -e "s|\${vault}|$vault|g" -e "s|\${step}|$step|g" -e "s|\${domain}|$domain|g"  scripts/.homelab > /etc/skel/.homelab
@@ -108,8 +119,13 @@ wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dear
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
 apt-get update
-apt-get install -y bind9utils dnsutils jq openjdk-19-jre-headless thunderbird apache2-utils
-apt-get install -y lubuntu-desktop xrdp firefox ldap-utils libpam-ldap  libnss-ldap nslcd vault
+apt-get install -y bind9utils dnsutils jq openjdk-19-jre-headless apache2-utils
+apt-get install -y ldap-utils libpam-ldap libnss-ldap nslcd vault
+
+if [[ "${desktop}" == "1" ]]
+then
+  apt-get install -y lubuntu-desktop xrdp thunderbird firefox
+fi
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 tar -xf keycloak-22.0.0.tar.gz
@@ -133,34 +149,40 @@ wget --progress=dot:giga https://github.com/docker/docker-credential-helpers/rel
 chmod a+rx /usr/local/bin/docker-credential-secretservice
 
 # user
-user=$(yq .username $userfile)
-givenname=$(yq .givenname $userfile)
-surname=$(yq .surname $userfile)
-gecos="${givenname} ${surname}"
-sed -e "s/\${USER}/${user}/g" conf/sudoers > /etc/sudoers.d/92-${user}
-id -u ${user} || adduser --home /home/${user} --shell /bin/bash --disabled-password --gecos "${gecos}" ${user}
+if [[ -n "${userfile}" ]]
+then
+  user=$(yq .username $userfile)
+  givenname=$(yq .givenname $userfile)
+  surname=$(yq .surname $userfile)
+  gecos="${givenname} ${surname}"
+
+  sed -e "s/\${USER}/${user}/g" conf/sudoers > /etc/sudoers.d/92-${user}
+  id -u ${user} || adduser --home /home/${user} --shell /bin/bash --disabled-password --gecos "${gecos}" ${user}
+else
+  user=ubuntu
+fi
 
 # setup
-service xrdp restart
 sudo systemctl enable nslcd
 systemctl start nslcd
 
 
+if [[ "${desktop}" == "1" ]]
+then
+  service xrdp restart
+
+  mkdir -p /etc/firefox/ca-certificates
+  chmod a+rx /etc/firefox/ca-certificates
+  cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
+  chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
+fi
 
 curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://${step}:8443/step_root_ca.crt
 curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://${step}:8443/step_intermediate_ca.crt
 
-mkdir -p /etc/firefox/ca-certificates
-chmod a+rx /etc/firefox/ca-certificates
-cp /usr/local/share/ca-certificates/step_root_ca.crt /etc/firefox/ca-certificates/step_root_ca.crt
-chmod a+r /etc/firefox/ca-certificates/step_root_ca.crt
-
-
 usermod -aG docker $user
 
 export user
-
-
 
 mkdir -p /home/${user}/.docker
 cat > /home/${user}/.docker/config.json <<EOF
@@ -170,4 +192,7 @@ cat > /home/${user}/.docker/config.json <<EOF
 EOF
 chown -R ${user}:${user} /home/${user}/.docker
 
-shutdown -r +1
+if [[ "${desktop}" == "1" ]]
+then
+  shutdown -r +1
+fi
