@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
+FLAGS=(runcluster)
 OPTIONS=(node host sshpubkey sshprivkey nodeprivkey)
 
 help_this="set up environment"
@@ -11,6 +12,7 @@ help_node="name of proxmox node"
 help_sshpubkey="file path containing ssh public key to access vms"
 help_sshprivkey="file path containing ssh private key to access vms"
 help_nodeprivkey="file path containing ssh private key to access proxmox node"
+help_runcluster="create additional kubernetes cluster for user applications"
 
 
 source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
@@ -258,11 +260,14 @@ ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addr
 
 scp ubuntu@k8s-core-master.${domain}:/home/ubuntu/init/creds/bootstrap-config.yml ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml
 
+if [[ "${runcluster}" == "1" ]]
+then
 ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "${run_lb_range}" --workers 2 --subdomain apps \
   --acme https://step.${domain}/acme/acme/directory --domain ${domain} --nameserver ${nameserver} \
   --pinniped pinniped.eng.${domain} --vault https://vault.${domain}:8200 \
   --cert_manager_tsig_name k8s-run-cert-manager --external_dns_tsig_name k8s-run-external-dns \
   --version v1.28
+fi
 
 ${SCRIPT_DIR}/preparevm --vmname bootstrap -- --disk 8
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
