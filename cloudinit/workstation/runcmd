@@ -127,6 +127,8 @@ then
   apt-get install -y lubuntu-desktop xrdp thunderbird firefox
 fi
 
+echo y | unminimize
+
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
 tar -xf keycloak-22.0.0.tar.gz
 mv keycloak-22.0.0/bin/* /usr/local/bin/

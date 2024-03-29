@@ -30,7 +30,7 @@ export reverse_zone=2.168.192.in-addr.arpa
 export domain=home.arpa
 export core_lb_range=192.168.2.100-192.168.2.109
 export run_lb_range=192.168.2.110-192.168.2.119
-export img=https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+export img=https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
 export template_name=$(basename $img .img)
 
 
