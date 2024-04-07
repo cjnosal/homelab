@@ -31,7 +31,9 @@ export domain=home.arpa
 export core_lb_range=192.168.2.100-192.168.2.109
 export run_lb_range=192.168.2.110-192.168.2.119
 export img=https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
+workstation_img=https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
 export template_name=$(basename $img .img)
+workstation_template_name=$(basename $workstation_img .img)
 
 
 # init
@@ -43,7 +45,8 @@ ssh-add ${sshprivkey}
 ssh-add ${nodeprivkey}
 
 # prepare vm template
-${SCRIPT_DIR}/updatetemplate --img ${template_name} || ${SCRIPT_DIR}/createtemplate
+${SCRIPT_DIR}/updatetemplate --img ${template_name} || ${SCRIPT_DIR}/createtemplate --img ${img}
+${SCRIPT_DIR}/updatetemplate --img ${workstation_template_name} || ${SCRIPT_DIR}/createtemplate --img ${workstation_img}
 
 # prepare service vms
 export nameserver=$(${SCRIPT_DIR}/ips --next)
@@ -174,7 +177,7 @@ step ca provisioner update keycloak --admin=step-provisioner-admin  $CONFIG
 sudo systemctl restart step-ca
 EOF
 
-${SCRIPT_DIR}/preparevm --vmname workstation -- --cores 4 --memory 16384 --disk 32
+${SCRIPT_DIR}/preparevm --vmname workstation -- --cores 4 --memory 16384 --disk 32 --template_name $workstation_template_name
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
   ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
   ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../cloudinit/user.yml \
