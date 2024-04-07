@@ -125,7 +125,6 @@ apt-get install -y ldap-utils libpam-ldap libnss-ldap nslcd vault
 if [[ "${desktop}" == "1" ]]
 then
   apt-get install -y lubuntu-desktop xrdp thunderbird firefox
-  echo y | unminimize
 fi
 
 wget --progress=dot:giga https://github.com/keycloak/keycloak/releases/download/22.0.0/keycloak-22.0.0.tar.gz
