@@ -8,6 +8,9 @@ pushd ${SCRIPT_DIR}
 cp include/argshelper /usr/local/include/
 
 # packages
+debconf-set-selections <<EOF
+debconf debconf/frontend select Noninteractive
+EOF
 apt-get install -y jq debian-keyring debian-archive-keyring apt-transport-https curl ed
 
 # user
