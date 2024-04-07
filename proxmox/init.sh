@@ -284,6 +284,7 @@ ssh ubuntu@bootstrap.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@bootstrap.${domain} sudo bash << EOF
+set -euo pipefail
 /home/ubuntu/init/workstation/runcmd --domain "${domain}"
 
 export LDAP_BIND_UID="bootstrap"
