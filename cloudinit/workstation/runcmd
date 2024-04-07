@@ -149,8 +149,8 @@ systemctl start nslcd
 
 
 
-curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://${step}:8443/step_root_ca.crt
-curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://${step}:8443/step_intermediate_ca.crt
+curl -fSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://${step}:8444/step_root_ca.crt
+curl -fSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://${step}:8444/step_intermediate_ca.crt
 
 mkdir -p /etc/firefox/ca-certificates
 chmod a+rx /etc/firefox/ca-certificates

@@ -1,10 +1,10 @@
 {
         skip_install_trust
         ocsp_stapling off
-        https_port 8443
+        https_port 8444
 }
 
-${hostname}.${domain}:8443 {
+${hostname}.${domain}:8444 {
         tls {
                 # must be on port 443, which is taken by step online CA
                 # http challenge must be on port 80, which is free

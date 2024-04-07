@@ -104,7 +104,7 @@ then
         sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" -e "s|\${acme}|${acme}|g" conf/Caddyfile > /etc/caddy/Caddyfile
         systemctl restart caddy
         systemctl is-active caddy --wait
-        while ! curl -SsL https://${hostname}.${domain}:8443/; do echo waiting for caddy tls; sleep 2; done
+        while ! curl -SsL https://${hostname}.${domain}:8444/; do echo waiting for caddy tls; sleep 2; done
 
 else
 	/home/ubuntu/init/creds/joincmd

@@ -24,8 +24,8 @@ ssh -i .ssh/vm ubuntu@step.home.arpa sudo cat /etc/step-ca/certs/intermediate_ca
 
 ## trust CA in existing vm
 ```
-sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8443/step_root_ca.crt
-sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8443/step_intermediate_ca.crt
+sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_root_ca.crt https://step.home.arpa:8444/step_root_ca.crt
+sudo curl -kfSsL -o /usr/local/share/ca-certificates/step_intermediate_ca.crt https://step.home.arpa:8444/step_intermediate_ca.crt
 sudo chmod -R a+r /usr/local/share/ca-certificates/*.crt
 sudo update-ca-certificates
 ```
@@ -72,7 +72,7 @@ NOTE: when promted for superuser admin name/subject you must enter the groupname
 On the workstation:
 ```
 step ca bootstrap --ca-url https://step.home.arpa --install \
-  --fingerprint $(curl -fSsL https://step.home.arpa:8443/fingerprint)
+  --fingerprint $(curl -fSsL https://step.home.arpa:8444/fingerprint)
 ```
 
 ## issue a certificate

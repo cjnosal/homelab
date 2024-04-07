@@ -50,7 +50,7 @@ Run `sync-realm` on keycloak VM if defining new groups
 ## Access
 The master node serves the pinniped kubeconfig (which does not contain secrets)
 
-`curl -fSsL https://k8s-${CLUSTER}-master.home.arpa:8443/kubeconfig > ~/.kube/config`
+`curl -fSsL https://k8s-${CLUSTER}-master.home.arpa:8444/kubeconfig > ~/.kube/config`
 
 kubectl will invoke the pinniped CLI to prompt for credentials
 

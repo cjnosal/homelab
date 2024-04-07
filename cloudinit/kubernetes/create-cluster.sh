@@ -128,4 +128,4 @@ EOF
 echo
 echo "cluster ready"
 echo "to log in from your workstation run:"
-echo "curl -fSsL https://${mastervm}.${domain}:8443/kubeconfig > ~/.kube/config"
+echo "curl -fSsL https://${mastervm}.${domain}:8444/kubeconfig > ~/.kube/config"

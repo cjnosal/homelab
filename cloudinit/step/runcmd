@@ -82,10 +82,10 @@ chmod -R a+r /usr/share/caddy
 
 systemctl restart caddy
 systemctl is-active caddy --wait
-while ! curl -SsL https://${hostname}.${domain}:8443/; do echo waiting for caddy tls; sleep 2; done
+while ! curl -SsL https://${hostname}.${domain}:8444/; do echo waiting for caddy tls; sleep 2; done
 
 # smoke test
-curl -fSsL https://${hostname}.${domain}:8443/step_root_ca.crt
+curl -fSsL https://${hostname}.${domain}:8444/step_root_ca.crt
 sudo -u ubuntu -- bash -c "export STEPPATH=/home/ubuntu/.step; step ca bootstrap --ca-url https://${hostname}.${domain}:443 --install --fingerprint $(step certificate fingerprint  /usr/local/share/ca-certificates/root_ca.crt)"
 
 popd
