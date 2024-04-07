@@ -7,7 +7,7 @@ Create an open LDAP server
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/ldap ./workspace/cloudinit/user.yml ubuntu@ldap.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@ldap.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@ldap.home.arpa sudo bash << EOF
-/home/ubuntu/init/ldap/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+/home/ubuntu/init/ldap/runcmd --domain "home.arpa" --acme "https://step.home.arpa" \
   --userfile /home/ubuntu/init/user.yml
 EOF
 ```

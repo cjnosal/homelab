@@ -23,8 +23,6 @@ requireargs domain network
 
 id -u step || adduser --system step --home /etc/step-ca --group
 
-ACME=https://${hostname}.${domain}/acme/acme/directory
-
 wget --progress=dot:giga https://dl.smallstep.com/gh-release/cli/docs-cli-install/v0.25.1/step-cli_0.25.1_amd64.deb
 wget --progress=dot:giga https://dl.smallstep.com/gh-release/certificates/gh-release-header/v0.25.2/step-ca_0.25.2_amd64.deb
 dpkg -i step-cli_0.25.1_amd64.deb

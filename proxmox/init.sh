@@ -87,7 +87,7 @@ ${SCRIPT_DIR}/preparevm --vmname ldap
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap ${SCRIPT_DIR}/../cloudinit/user.yml ubuntu@ldap.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@ldap.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@ldap.${domain} sudo bash << EOF
-/home/ubuntu/init/ldap/runcmd --domain "${domain}" --acme "https://step.${domain}/acme/acme/directory" \
+/home/ubuntu/init/ldap/runcmd --domain "${domain}" --acme "https://step.${domain}" \
   --userfile /home/ubuntu/init/user.yml
 EOF
 BOOTSTRAP_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
@@ -101,7 +101,7 @@ ${SCRIPT_DIR}/preparevm --vmname keycloak -- --disk 8
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/keycloak ubuntu@keycloak.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@keycloak.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@keycloak.${domain} sudo bash << EOF
-/home/ubuntu/init/keycloak/runcmd --domain "${domain}" --acme "https://step.${domain}/acme/acme/directory" \
+/home/ubuntu/init/keycloak/runcmd --domain "${domain}" --acme "https://step.${domain}" \
   --ldap ldaps://ldap.${domain} --mail mail.${domain}
 EOF
 KEYCLOAK_ADMIN_PASSWD=$(ssh -o LogLevel=error ubuntu@keycloak.${domain} sudo cat /root/keycloak_admin.passwd)
@@ -121,7 +121,7 @@ scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_inter
 ssh ubuntu@vault.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/vault-client-secret ubuntu@vault.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@vault.${domain} sudo bash << EOF
-/home/ubuntu/init/vault/runcmd --domain "${domain}" --acme "https://step.${domain}/acme/acme/directory" \
+/home/ubuntu/init/vault/runcmd --domain "${domain}" --acme "https://step.${domain}" \
   --ldap ldaps://ldap.${domain} --oidc https://keycloak.${domain}:8443/realms/infrastructure \
   --clientsecret /home/ubuntu/init/creds/vault-client-secret --subnet ${subnet},127.0.0.0/8
 EOF
@@ -205,7 +205,7 @@ scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_inter
 ssh ubuntu@mail.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@mail.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@mail.${domain} sudo bash << EOF
-/home/ubuntu/init/mail/runcmd --domain "${domain}" --acme "https://step.${domain}/acme/acme/directory" \
+/home/ubuntu/init/mail/runcmd --domain "${domain}" --acme "https://step.${domain}" \
   --network ${subnet} --nameserver ${nameserver} --ldap ldaps://ldap.${domain}
 EOF
 
@@ -256,7 +256,7 @@ ssh ubuntu@bind.${domain} sudo cat /etc/bind/named.conf.tsigkeys > ${SCRIPT_DIR}
 
 ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addresses "${core_lb_range}" --workers 2 --subdomain eng \
   --cert_manager_tsig_name k8s-core-cert-manager --external_dns_tsig_name k8s-core-external-dns \
-  --acme https://step.${domain}/acme/acme/directory --domain ${domain} --nameserver ${nameserver} \
+  --acme https://step.${domain} --domain ${domain} --nameserver ${nameserver} \
   --pinniped pinniped.eng.${domain} --vault https://vault.${domain}:8200 \
   --client_id pinniped --keycloak https://keycloak.${domain}:8443 --supervisor \
   --version v1.28
@@ -266,7 +266,7 @@ scp ubuntu@k8s-core-master.${domain}:/home/ubuntu/init/creds/bootstrap-config.ym
 if [[ "${runcluster}" == "1" ]]
 then
 ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "${run_lb_range}" --workers 2 --subdomain apps \
-  --acme https://step.${domain}/acme/acme/directory --domain ${domain} --nameserver ${nameserver} \
+  --acme https://step.${domain} --domain ${domain} --nameserver ${nameserver} \
   --pinniped pinniped.eng.${domain} --vault https://vault.${domain}:8200 \
   --cert_manager_tsig_name k8s-run-cert-manager --external_dns_tsig_name k8s-run-external-dns \
   --version v1.28

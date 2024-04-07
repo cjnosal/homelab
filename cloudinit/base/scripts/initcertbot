@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+FLAGS=(certbot step)
 OPTIONS=(acme san group fullchain chain cert key)
 
-help_this="install certbot and acquire a certificate from the smallstep CA via http01"
+help_this="generate a certificate"
+help_certbot="install certbot and acquire a certificate from the smallstep CA via http01 challenge (default)"
+help_step="use step cli and admin credentials to generate a certificate"
 help_acme="acme directory url"
 help_san="desired SAN"
 help_group="linux group to grant read access to generated certs and keys"
@@ -16,22 +19,44 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs acme san group
 
-if [[ ! -f /usr/bin/certbot ]]
+if [[ "${certbot}" == "0" && "${step}" == "1" || -d /etc/step-ca ]]
 then
-  snap install --classic certbot
-  ln -s /snap/bin/certbot /usr/bin/certbot
+  if [[ ! -d /root/.step ]]
+  then
+    bash -c "export STEPPATH=/root/.step; step ca bootstrap --ca-url ${acme} --install --fingerprint $(step certificate fingerprint  /usr/local/share/ca-certificates/root_ca.crt)"
+  fi
+
+  expiry=$(date -d "$(date +%Y-%m-%d) + 1 year" "+%Y-%m-%dT00:00:00Z")
+  mkdir -p /etc/letsencrypt/live/${san}
+  mkdir -p /etc/letsencrypt/archive
+  ln -s /etc/letsencrypt/live/${san} /etc/letsencrypt/archive/${san}
+  step ca certificate $san /etc/letsencrypt/live/${san}/cert.pem /etc/letsencrypt/live/${san}/privkey.pem \
+    --provisioner cert-provisioner --not-after=${expiry} --password-file /etc/step-ca/password.txt
+
+  cat /etc/step-ca/certs/root_ca.crt > /etc/letsencrypt/live/${san}/chain.pem
+  cat  /etc/letsencrypt/live/${san}/cert.pem /etc/letsencrypt/live/${san}/chain.pem > /etc/letsencrypt/live/${san}/fullchain.pem
+
+else
+
+  if [[ ! -f /usr/bin/certbot ]]
+  then
+    snap install --classic certbot
+    ln -s /snap/bin/certbot /usr/bin/certbot
+  fi
+
+  export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+  if ! grep -q REQUESTS_CA_BUNDLE /etc/environment
+  then
+    echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
+  fi
+
+  certbot certonly --standalone --server ${acme}/acme/acme/directory --register-unsafely-without-email --cert-name ${san} -d ${san} || certbot renew
+
 fi
 
-export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-if ! grep -q REQUESTS_CA_BUNDLE /etc/environment
-then
-  echo "REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt" | sudoappend /etc/environment
-fi
-
-certbot certonly --standalone --server $acme --register-unsafely-without-email --cert-name ${san} -d ${san} || certbot renew
-chmod g+rx /etc/letsencrypt/archive
+chmod a+rx /etc/letsencrypt/archive
 chmod g+rx /etc/letsencrypt/archive/${san}
-chmod g+rx /etc/letsencrypt/live
+chmod a+rx /etc/letsencrypt/live
 chmod g+rx /etc/letsencrypt/live/${san}
 if [[ -n "${fullchain:-}" ]]
 then
@@ -61,5 +86,6 @@ then
   ln -s /etc/letsencrypt/live/${san}/privkey.pem $key
   chmod 640 $key
 fi
-chgrp -R $group /etc/letsencrypt
+
+chmod a+rx /etc/letsencrypt
 chgrp -R $group /etc/letsencrypt/archive/${san}/

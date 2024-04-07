@@ -123,7 +123,7 @@ metadata:
   name: step-issuer
 spec:
   acme:
-    server: ${acme}
+    server: ${acme}/acme/acme/directory
     privateKeySecretRef:
       name: step-account-key
     caBundle: "$STEP_CA_B64"
@@ -149,7 +149,7 @@ metadata:
   name: bind-issuer
 spec:
   acme:
-    server: ${acme}
+    server: ${acme}/acme/acme/directory
     privateKeySecretRef:
       name: step-account-key-bind
     caBundle: "$STEP_CA_B64"

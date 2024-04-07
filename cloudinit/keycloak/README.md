@@ -6,7 +6,7 @@ OIDC integration with openLDAP
 scp -r ./workspace/cloudinit/base ./workspace/cloudinit/keycloak ubuntu@keycloak.home.arpa:/home/ubuntu/init
 scp -r ./workspace/creds/step_root_ca.crt ./workspace/creds/step_intermediate_ca.crt ubuntu@keycloak.home.arpa:/home/ubuntu/init/certs
 ssh ubuntu@keycloak.home.arpa sudo bash << EOF
-/home/ubuntu/init/keycloak/runcmd --domain "home.arpa" --acme "https://step.home.arpa/acme/acme/directory" \
+/home/ubuntu/init/keycloak/runcmd --domain "home.arpa" --acme "https://step.home.arpa" \
   --ldap ldaps://ldap.home.arpa
 EOF
 ```

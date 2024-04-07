@@ -8,7 +8,7 @@ ${hostname}.${domain}:8444 {
         tls {
                 # must be on port 443, which is taken by step online CA
                 # http challenge must be on port 80, which is free
-                issuer acme ${acme} {
+                issuer acme ${acme}/acme/acme/directory {
                         email caddy@${domain}
                         disable_tlsalpn_challenge
                         trusted_roots /etc/ssl/certs/ca-certificates.crt

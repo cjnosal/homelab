@@ -37,13 +37,13 @@ Run `sync-realm` on keycloak VM if defining new groups
 ### Core cluster with pinniped supervisor
 ./workspace/cloudinit/kubernetes/create-cluster.sh --cluster core --lb_addresses "192.168.2.100-192.168.2.109" --workers 2 --subdomain eng \
   --cert_manager_tsig_name k8s-core-cert-manager --external_dns_tsig_name k8s-core-external-dns \
-  --acme https://step.home.arpa/acme/acme/directory --domain home.arpa --nameserver 192.168.2.201 \
+  --acme https://step.home.arpa --domain home.arpa --nameserver 192.168.2.201 \
   --pinniped pinniped.eng.home.arpa --vault https://vault.home.arpa:8200 \
   --client_id pinniped --keycloak https://keycloak.home.arpa:8443 --supervisor
 
 ### Run cluster
 ./workspace/cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addresses "192.168.2.110-192.168.2.119" --workers 2 --subdomain apps \
-  --acme https://step.home.arpa/acme/acme/directory --domain home.arpa --nameserver 192.168.2.201 \
+  --acme https://step.home.arpa --domain home.arpa --nameserver 192.168.2.201 \
   --pinniped pinniped.eng.home.arpa --vault https://vault.home.arpa:8200 \
   --cert_manager_tsig_name k8s-run-cert-manager --external_dns_tsig_name k8s-run-external-dns
 
