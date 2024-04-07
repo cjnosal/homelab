@@ -100,7 +100,7 @@ helm repo add traefik https://traefik.github.io/charts
 helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namespace \
   --set providers.kubernetesIngress.publishedService.enabled=true \
   --set ports.ssh.port=2222 \
-  --set ports.ssh.expose=true \
+  --set ports.ssh.expose.default=true \
   --set ports.ssh.exposedPort=22 \
   --set logs.general.level=INFO \
   --set logs.access.enabled=true
