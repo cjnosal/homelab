@@ -7,7 +7,7 @@ pushd ${SCRIPT_DIR}
 
 # args
 
-OPTIONS=(domain acme ldap network nameserver)
+OPTIONS=(domain acme ldap network nameserver subdomain)
 
 help_this="initialize mail server"
 help_domain="parent domain of this environment"
@@ -15,6 +15,7 @@ help_acme="acme directory url to acquire TLS cert"
 help_ldap="ldap directory url"
 help_network="internal network cidr"
 help_nameserver="IP address of DNS resolver"
+help_subdomain="subdomain for this service (defaults to hostname)"
 
 ../base/runcmd
 
@@ -22,10 +23,13 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs domain acme ldap network nameserver
 
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
+
 # ldap dc components from $domain
 export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
-
-hostname=$(hostname)
 
 # conf
 mkdir -p /etc/dovecot/conf.d
@@ -46,17 +50,17 @@ cp conf/clamav-milter.conf /etc/clamav/clamav-milter.conf
 cp conf/default.sieve /var/mail/vmail/sieve-before/default.sieve
 sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/dovecot-ldap.conf.ext > /etc/dovecot/dovecot-ldap.conf.ext
 cp conf/init.pre /etc/spamassassin/init.pre
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/KeyTable > /etc/opendkim/KeyTable
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g" conf/KeyTable > /etc/opendkim/KeyTable
 sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-accounts.cf > /etc/postfix/ldap-accounts.cf
 sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-aliases.cf > /etc/postfix/ldap-aliases.cf
 sed -e "s|\${ldap}|${ldap}|g" -e "s/\${suffix}/${suffix}/g" conf/ldap-senders.cf > /etc/postfix/ldap-senders.cf
 cp conf/local.cf /etc/spamassassin/local.cf
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/mailname > /etc/mailname
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g"  -e "s|\${network}|${network}|g" conf/main.cf > /etc/postfix/main.cf
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g" conf/mailname > /etc/mailname
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g"  -e "s|\${network}|${network}|g" conf/main.cf > /etc/postfix/main.cf
 cp conf/master.cf /etc/postfix/master.cf
 sed -e "s/\${nameserver}/${nameserver}/g" conf/opendkim.conf > /etc/opendkim.conf
 cp conf/razor-agent.conf /var/lib/spamassassin/.razor/razor-agent.conf
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/SigningTable > /etc/opendkim/SigningTable
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g" conf/SigningTable > /etc/opendkim/SigningTable
 cp conf/spamass-milter /etc/default/spamass-milter
 cp conf/spamassassin /etc/default/spamassassin
 cp conf/TrustedHosts /etc/opendkim/TrustedHosts
@@ -64,10 +68,10 @@ sed -e "s/\${domain}/${domain}/g" conf/virtual > /etc/postfix/virtual
 sed -e "s/\${domain}/${domain}/g" conf/virtual-mailbox-domains > /etc/postfix/virtual-mailbox-domains
 
 # setup
-initcertbot --acme $acme --group mail --san ${hostname}.${domain} --fullchain /etc/ssl/certs/tls.crt --key /etc/ssl/private/tls.key
+initcertbot --acme $acme --group mail --san ${subdomain}.${domain} --fullchain /etc/ssl/certs/tls.crt --key /etc/ssl/private/tls.key
 
 debconf-set-selections <<EOF
-postfix postfix/mailname        string  ${hostname}.${domain}
+postfix postfix/mailname        string  ${subdomain}.${domain}
 postfix postfix/main_mailer_type        select  Internet Site
 EOF
 
@@ -105,7 +109,7 @@ service dovecot restart
 
 
 # dkim setup
-opendkim-genkey -r -h sha256 -d ${hostname}.${domain} -s mail --directory /etc/opendkim
+opendkim-genkey -r -h sha256 -d ${subdomain}.${domain} -s mail --directory /etc/opendkim
 ln -s /etc/opendkim/mail.private /etc/opendkim/mail
 chmod 400 /etc/opendkim/mail.private
 

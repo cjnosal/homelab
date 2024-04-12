@@ -6,12 +6,13 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(domain acme userfile)
+OPTIONS=(domain acme userfile subdomain)
 
 help_this="initialize ldap server"
 help_domain="parent domain of this environment"
 help_acme="acme directory url to acquire TLS cert"
 help_userfile="path of user.yml defining profile for first admin"
+help_subdomain="subdomain for this service (defaults to hostname)"
 
 ../base/runcmd
 
@@ -19,7 +20,10 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs userfile domain acme
 
-export hostname=$(hostname | cut -d'.' -f1)
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
 
 # ldap dc components from $domain
 export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
@@ -29,8 +33,8 @@ export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e
 mkdir -p /etc/ldap
 mkdir -p /etc/sssd
 
-sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$hostname/g" -e "s/\${suffix}/$suffix/g" conf/ldap.conf > /etc/ldap/ldap.conf
-sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$hostname/g" -e "s/\${suffix}/$suffix/g" conf/sssd.conf > /etc/sssd/sssd.conf
+sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$subdomain/g" -e "s/\${suffix}/$suffix/g" conf/ldap.conf > /etc/ldap/ldap.conf
+sed -e "s/\${domain}/$domain/g" -e "s/\${hostname}/$subdomain/g" -e "s/\${suffix}/$suffix/g" conf/sssd.conf > /etc/sssd/sssd.conf
 cp conf/slapd /etc/default/slapd
 
 sed -e "s/\${suffix}/$suffix/g" conf/org.ldif > /etc/ldap/org.ldif
@@ -41,7 +45,7 @@ cp scripts/* /usr/local/bin/
 
 cat > /usr/local/include/ldap.env << EOF
    SUFFIX=${suffix}
-   HOST=${hostname}.${domain}
+   HOST=${subdomain}.${domain}
    DOMAIN=${domain}
 EOF
 
@@ -90,12 +94,12 @@ wget --progress=dot:giga https://github.com/mikefarah/yq/releases/latest/downloa
 chmod +x /usr/local/bin/yq
 
 # setup
-initcertbot --acme $acme --group openldap --san ${hostname}.${domain} --chain /etc/ldap/ca.pem --key /etc/ldap/key.pem --cert /etc/ldap/cert.pem
+initcertbot --acme $acme --group openldap --san ${subdomain}.${domain} --chain /etc/ldap/ca.pem --key /etc/ldap/key.pem --cert /etc/ldap/cert.pem
 
 ldapmodify -Q -Y EXTERNAL -H ldapi:/// -f conf/certinfo.ldif
 ldapmodify -Q -Y EXTERNAL -H ldapi:/// -f /etc/ldap/access.ldif
 
-hostnamectl set-hostname ${hostname}.${domain}
+hostnamectl set-hostname ${subdomain}.${domain}
 
 systemctl restart sssd.service
 systemctl restart slapd

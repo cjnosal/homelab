@@ -6,15 +6,15 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(forwarders network zone reverse_zone)
+OPTIONS=(forwarders network zone reverse_zone subdomain)
 
 help_this="initialize bind server"
 help_forwarders="upstream dns servers (; delimited)"
 help_network="internal network cidr"
 help_zone="forward dns zone"
 help_reverse_zone="reverse zone"
+help_subdomain="subdomain for this service (defaults to hostname)"
 
-export hostname=$(hostname)
 export ip=$(hostname -I | sed -e 's/ $//')
 export ptr=$(cut -d'.' -f 4 <<< $ip)
 
@@ -23,6 +23,11 @@ export ptr=$(cut -d'.' -f 4 <<< $ip)
 source /usr/local/include/argshelper
 parseargs $@
 requireargs forwarders network zone reverse_zone
+
+if [[ -z "${subdomain}" ]]
+then
+	export subdomain=$(hostname)
+fi
 
 # packages
 apt-get install -y  bind9 bind9utils bind9-doc dnsutils
@@ -45,8 +50,8 @@ fi
 
 sed -e "s:\${network}:$network:g" -e "s/\${forwarders}/$forwarders/g" conf/named.conf.options > /etc/bind/named.conf.options
 sed -e "s/\${zone}/$zone/g" -e "s/\${reverse_zone}/$reverse_zone/g" conf/named.conf.local > /etc/bind/named.conf.local
-sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$hostname/g" -e "s/\${ip}/$ip/g" conf/forward.zone > /var/lib/bind/forward.${zone}
-sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$hostname/g" -e "s/\${ip}/$ip/g" -e "s/\${ptr}/$ptr/g" conf/reverse.zone > /var/lib/bind/reverse.${zone}
+sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$subdomain/g" -e "s/\${ip}/$ip/g" conf/forward.zone > /var/lib/bind/forward.${zone}
+sed -e "s/\${zone}/$zone/g" -e "s/\${hostname}/$subdomain/g" -e "s/\${ip}/$ip/g" -e "s/\${ptr}/$ptr/g" conf/reverse.zone > /var/lib/bind/reverse.${zone}
 
 cat > /usr/local/include/bind.env << EOF
 ZONE=$zone
@@ -77,8 +82,8 @@ systemctl restart named
 systemctl is-active named --wait
 
 # smoke test
-[[ "$(dig @${ip} -4 -tA ${hostname}.${zone}. +noall +answer | awk '{print $5}')" == "${ip}" ]]
-[[ "$(dig @${ip} -4 -tPTR ${ptr}.${reverse_zone}. +noall +answer | awk '{print $5}')" == "${hostname}.${zone}." ]]
+[[ "$(dig @${ip} -4 -tA ${subdomain}.${zone}. +noall +answer | awk '{print $5}')" == "${ip}" ]]
+[[ "$(dig @${ip} -4 -tPTR ${ptr}.${reverse_zone}. +noall +answer | awk '{print $5}')" == "${subdomain}.${zone}." ]]
 
 popd
 echo success

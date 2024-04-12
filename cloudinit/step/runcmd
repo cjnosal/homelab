@@ -6,13 +6,12 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(network domain)
+OPTIONS=(network domain subdomain)
 
 help_this="initialize smallstep certificate authority"
 help_domain="parent domain (e.g. home.arpa)"
 help_network="internal network cidr"
-
-export hostname=$(hostname)
+help_subdomain="subdomain for this service (defaults to hostname)"
 
 ../base/runcmd
 
@@ -20,6 +19,10 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs domain network
 
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
 
 id -u step || adduser --system step --home /etc/step-ca --group
 
@@ -43,15 +46,15 @@ if [[ ! -f /etc/step-ca/certs/intermediate_ca.crt ]]
 then
   step ca init --remote-management --acme \
     --name homelab-pki \
-    --dns ${hostname}.${domain} \
+    --dns ${subdomain}.${domain} \
     --address 0.0.0.0:443 \
-    --with-ca-url https://${hostname}.${domain} \
+    --with-ca-url https://${subdomain}.${domain} \
     --provisioner cert-provisioner \
     --password-file /etc/step-ca/password.txt
 fi
 
 
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" -e "s:\${network}:${network}:g" conf/ca.json > /etc/step-ca/config/ca.json
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g" -e "s:\${network}:${network}:g" conf/ca.json > /etc/step-ca/config/ca.json
 chown -R step:step /etc/step-ca
 
 cp -r /etc/step-ca/certs/* /usr/local/share/ca-certificates/
@@ -63,13 +66,13 @@ wget --progress=dot:giga https://raw.githubusercontent.com/smallstep/certificate
 systemctl enable --now step-ca
 systemctl is-active step-ca --wait
 
-while ! curl -fSsL https://${hostname}.${domain}:443/health; do echo waiting for step ca; sleep 2; done
+while ! curl -fSsL https://${subdomain}.${domain}:443/health; do echo waiting for step ca; sleep 2; done
 
 addcaddy.sh
 usermod -aG step caddy
 chmod g+rx /etc/step-ca/certs
 chmod g+r /etc/step-ca/certs/root_ca.crt
-sed -e "s/\${domain}/${hostname}.${domain}/g" conf/Caddyfile > /etc/caddy/Caddyfile
+sed -e "s/\${domain}/${subdomain}.${domain}/g" conf/Caddyfile > /etc/caddy/Caddyfile
 
 step certificate fingerprint /etc/step-ca/certs/root_ca.crt > /usr/share/caddy/fingerprint
 cp /etc/step-ca/certs/root_ca.crt /usr/share/caddy/step_root_ca.crt
@@ -80,11 +83,11 @@ chmod -R a+r /usr/share/caddy
 
 systemctl restart caddy
 systemctl is-active caddy --wait
-while ! curl -SsL https://${hostname}.${domain}:8444/; do echo waiting for caddy tls; sleep 2; done
+while ! curl -SsL https://${subdomain}.${domain}:8444/; do echo waiting for caddy tls; sleep 2; done
 
 # smoke test
-curl -fSsL https://${hostname}.${domain}:8444/step_root_ca.crt
-sudo -u ubuntu -- bash -c "export STEPPATH=/home/ubuntu/.step; step ca bootstrap --ca-url https://${hostname}.${domain}:443 --install --fingerprint $(step certificate fingerprint  /usr/local/share/ca-certificates/root_ca.crt)"
+curl -fSsL https://${subdomain}.${domain}:8444/step_root_ca.crt
+sudo -u ubuntu -- bash -c "export STEPPATH=/home/ubuntu/.step; step ca bootstrap --ca-url https://${subdomain}.${domain}:443 --install --fingerprint $(step certificate fingerprint  /usr/local/share/ca-certificates/root_ca.crt)"
 
 popd
 

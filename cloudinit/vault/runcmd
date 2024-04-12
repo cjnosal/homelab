@@ -5,7 +5,7 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(domain acme ldap oidc clientsecret subnet)
+OPTIONS=(domain acme ldap oidc clientsecret subnet subdomain)
 
 help_this="initialize vault server"
 help_domain="parent domain of this environment"
@@ -14,6 +14,7 @@ help_ldap="url of LDAP host"
 help_oidc="oidc discovery url of keycloak host"
 help_clientsecret="file path to oidc client secret"
 help_subnet="CIDR range allowed to use the ssh-host approle to request ssh certificate"
+help_subdomain="subdomain for this service (defaults to hostname)"
 
 ../base/runcmd
 
@@ -21,7 +22,10 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs domain acme ldap oidc clientsecret subnet
 
-export hostname=$(hostname | cut -d'.' -f1)
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
 
 # ldap dc components from $domain
 export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
@@ -43,18 +47,18 @@ then
 fi
 
 # conf
-sed -e "s/\${hostname}/${hostname}/g" -e "s/\${domain}/${domain}/g" conf/vault.hcl > /etc/vault.d/vault.hcl
+sed -e "s/\${hostname}/${subdomain}/g" -e "s/\${domain}/${domain}/g" conf/vault.hcl > /etc/vault.d/vault.hcl
 chown vault:vault /etc/vault.d/vault.hcl
 
 cat > /usr/local/include/vault.env << EOF
-export VAULT_ADDR=https://${hostname}.${domain}:8200
+export VAULT_ADDR=https://${subdomain}.${domain}:8200
 EOF
 source /usr/local/include/vault.env
 
 cp scripts/* /usr/local/bin/
 
 # setup
-initcertbot --acme $acme --group vault --san ${hostname}.${domain} \
+initcertbot --acme $acme --group vault --san ${subdomain}.${domain} \
   --fullchain /opt/vault/tls/tls.crt --key /opt/vault/tls/tls.key
 
 swapoff -a
@@ -64,7 +68,7 @@ systemctl enable vault
 systemctl start vault
 systemctl is-active vault --wait
 
-while ! curl -SsL https://${hostname}.${domain}:8200/v1/sys/health # sealed vault returns status 501
+while ! curl -SsL https://${subdomain}.${domain}:8200/v1/sys/health # sealed vault returns status 501
 do
   echo waiting for vault
   sleep 2
@@ -188,8 +192,8 @@ vault write auth/oidc/role/vault-admin -<<EOF
 {
   "bound_audiences": "vault",
   "allowed_redirect_uris": [
-    "https://${hostname}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
-    "https://${hostname}.${domain}:8250/oidc/callback",
+    "https://${subdomain}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
+    "https://${subdomain}.${domain}:8250/oidc/callback",
     "http://localhost:8250/oidc/callback"
   ],
   "user_claim": "preferred_username",
@@ -206,8 +210,8 @@ vault write auth/oidc/role/vault-user -<<EOF
 {
   "bound_audiences": "vault",
   "allowed_redirect_uris": [
-    "https://${hostname}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
-    "https://${hostname}.${domain}:8250/oidc/callback",
+    "https://${subdomain}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
+    "https://${subdomain}.${domain}:8250/oidc/callback",
     "http://localhost:8250/oidc/callback"
   ],
   "user_claim": "preferred_username",
@@ -224,8 +228,8 @@ vault write auth/oidc/role/ssh-ops -<<EOF
 {
   "bound_audiences": "vault",
   "allowed_redirect_uris": [
-    "https://${hostname}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
-    "https://${hostname}.${domain}:8250/oidc/callback",
+    "https://${subdomain}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
+    "https://${subdomain}.${domain}:8250/oidc/callback",
     "http://localhost:8250/oidc/callback"
   ],
   "user_claim": "preferred_username",
@@ -244,8 +248,8 @@ vault write auth/oidc/role/dns-ops -<<EOF
 {
   "bound_audiences": "vault",
   "allowed_redirect_uris": [
-    "https://${hostname}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
-    "https://${hostname}.${domain}:8250/oidc/callback",
+    "https://${subdomain}.${domain}:8200/ui/vault/auth/oidc/oidc/callback",
+    "https://${subdomain}.${domain}:8250/oidc/callback",
     "http://localhost:8250/oidc/callback"
   ],
   "user_claim": "preferred_username",

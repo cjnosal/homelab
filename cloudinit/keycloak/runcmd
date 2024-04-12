@@ -5,13 +5,14 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 pushd ${SCRIPT_DIR}
 
 # args
-OPTIONS=(domain acme ldap mail)
+OPTIONS=(domain acme ldap mail subdomain)
 
 help_this="initialize keycloak oidc server"
 help_domain="parent domain of this environment"
 help_acme="acme directory url to acquire TLS cert"
 help_ldap="url of LDAP host"
 help_mail="mail server"
+help_subdomain="subdomain for this service (defaults to hostname)"
 
 ../base/runcmd
 
@@ -19,7 +20,10 @@ source /usr/local/include/argshelper
 parseargs $@
 requireargs domain acme ldap mail
 
-export hostname=$(hostname | cut -d'.' -f1)
+if [[ -z "${subdomain}" ]]
+then
+  export subdomain=$(hostname)
+fi
 
 # ldap dc components from $domain
 export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e 's/^,//')
@@ -64,11 +68,11 @@ mkdir -p /opt/keycloak/conf
 sed -e "s/\${admincred}/${admincred}/g" conf/keycloak.service > /etc/systemd/system/keycloak.service
 chmod 600 /etc/systemd/system/keycloak.service
 
-sed -e "s/\${dbcred}/${dbcred}/" -e "s/\${hostname}/${hostname}/" -e "s/\${domain}/${domain}/" conf/keycloak.conf > /opt/keycloak/conf/keycloak.conf
+sed -e "s/\${dbcred}/${dbcred}/" -e "s/\${hostname}/${subdomain}/" -e "s/\${domain}/${domain}/" conf/keycloak.conf > /opt/keycloak/conf/keycloak.conf
 
 cat > /usr/local/include/keycloak.env << EOF
    SUFFIX=${suffix}
-   HOST=https://${hostname}.${domain}:8443
+   HOST=https://${subdomain}.${domain}:8443
    DOMAIN=${domain}
    LDAP_HOST=${ldap}
 EOF
@@ -93,7 +97,7 @@ then
 fi
 /opt/keycloak/bin/kc.sh build --db=postgres
 
-initcertbot --acme $acme --group keycloak --san ${hostname}.${domain} \
+initcertbot --acme $acme --group keycloak --san ${subdomain}.${domain} \
   --fullchain /opt/keycloak/conf/server.crt.pem --key /opt/keycloak/conf/server.key.pem
 
 
@@ -101,7 +105,7 @@ systemctl enable keycloak
 systemctl start keycloak
 systemctl is-active keycloak --wait
 
-while ! curl -fSsL  https://${hostname}.${domain}:8443/health
+while ! curl -fSsL  https://${subdomain}.${domain}:8443/health
 do
 	echo waiting for keycloak
 	sleep 2

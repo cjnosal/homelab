@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 
-FLAGS=(runcluster)
+FLAGS=(runcluster compact)
 OPTIONS=(node host sshpubkey sshprivkey nodeprivkey)
 
 help_this="set up environment"
@@ -13,6 +13,7 @@ help_sshpubkey="file path containing ssh public key to access vms"
 help_sshprivkey="file path containing ssh private key to access vms"
 help_nodeprivkey="file path containing ssh private key to access proxmox node"
 help_runcluster="create additional kubernetes cluster for user applications"
+help_compact="reuse a base vm for multiple services to reduce memory footprint"
 
 
 source ${SCRIPT_DIR}/../cloudinit/base/include/argshelper
@@ -52,22 +53,46 @@ ${SCRIPT_DIR}/updatetemplate --img ${workstation_template_name} || ${SCRIPT_DIR}
 
 # prepare service vms
 export nameserver=$(${SCRIPT_DIR}/ips --next)
-${SCRIPT_DIR}/preparevm --vmname bind --skip_domain -- --ip ${nameserver} --nameserver ${gateway}
+nameserver_name=bind
+base_vm_args=""
+if [[ "${compact}" == "1" ]]
+then
+  nameserver_name=base
+  base_vm_args="--disk 32 --memory 16384"
+fi
+${SCRIPT_DIR}/preparevm --vmname $nameserver_name --skip_domain -- --ip ${nameserver} --nameserver ${gateway} ${base_vm_args}
 
+
+function aliashost {
+  TARGET_HOST=$1
+  ALIAS=$2
+  ssh ubuntu@${nameserver} addhost.sh ${ALIAS} $(dig -4 ${TARGET_HOST}.${domain} +noall +answer | awk '{print $5}')
+  ${SCRIPT_DIR}/waitforhost ${ALIAS}.${domain}
+}
 
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/bind ubuntu@${nameserver}:/home/ubuntu/init
 ssh ubuntu@${nameserver} sudo bash << EOF
-/home/ubuntu/init/bind/runcmd --network "${subnet}" --forwarders "${gateway}" --zone "${domain}" --reverse_zone "${reverse_zone}"
+/home/ubuntu/init/bind/runcmd --network "${subnet}" --forwarders "${gateway}" --subdomain bind --zone "${domain}" --reverse_zone "${reverse_zone}"
 EOF
 
 ${SCRIPT_DIR}/waitforhost bind.${domain}
 
 ssh ubuntu@bind.${domain} addhost.sh ${node} ${host}
 
-${SCRIPT_DIR}/preparevm --vmname step
+if [[ "${compact}" == "1" ]]
+then
+  aliashost bind base
+fi
+
+if [[ "${compact}" == "1" ]]
+then
+  aliashost base step
+else
+  ${SCRIPT_DIR}/preparevm --vmname step
+fi
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/step ubuntu@step.${domain}:/home/ubuntu/init
 ssh ubuntu@step.${domain} sudo bash << EOF
-/home/ubuntu/init/step/runcmd --network "${subnet}" --domain "${domain}"
+/home/ubuntu/init/step/runcmd --network "${subnet}" --domain "${domain}" --subdomain step
 EOF
 
 # fetch ca for new vms
@@ -87,7 +112,7 @@ ${SCRIPT_DIR}/preparevm --vmname ldap
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap ${SCRIPT_DIR}/../cloudinit/user.yml ubuntu@ldap.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@ldap.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@ldap.${domain} sudo bash << EOF
-/home/ubuntu/init/ldap/runcmd --domain "${domain}" --acme "https://step.${domain}" \
+/home/ubuntu/init/ldap/runcmd --domain "${domain}" --subdomain ldap --acme "https://step.${domain}" \
   --userfile /home/ubuntu/init/user.yml
 EOF
 BOOTSTRAP_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
@@ -97,11 +122,16 @@ EOF
 )
 echo $BOOTSTRAP_PASSWORD > ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd
 
-${SCRIPT_DIR}/preparevm --vmname keycloak -- --disk 8
+if [[ "${compact}" == "1" ]]
+then
+  aliashost base keycloak
+else
+  ${SCRIPT_DIR}/preparevm --vmname keycloak -- --disk 8
+fi
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/keycloak ubuntu@keycloak.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@keycloak.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@keycloak.${domain} sudo bash << EOF
-/home/ubuntu/init/keycloak/runcmd --domain "${domain}" --acme "https://step.${domain}" \
+/home/ubuntu/init/keycloak/runcmd --domain "${domain}" --subdomain keycloak --acme "https://step.${domain}" \
   --ldap ldaps://ldap.${domain} --mail mail.${domain}
 EOF
 KEYCLOAK_ADMIN_PASSWD=$(ssh -o LogLevel=error ubuntu@keycloak.${domain} sudo cat /root/keycloak_admin.passwd)
@@ -115,13 +145,18 @@ cd /opt/keycloak/bin
   -s 'redirectUris=["http://localhost:8250/oidc/callback","https://vault.${domain}:8250/oidc/callback","https://vault.${domain}:8200/ui/vault/auth/oidc/oidc/callback"]'
 EOF
 
-${SCRIPT_DIR}/preparevm --vmname vault
+if [[ "${compact}" == "1" ]]
+then
+  aliashost base vault
+else
+  ${SCRIPT_DIR}/preparevm --vmname vault
+fi
 scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/vault ubuntu@vault.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@vault.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@vault.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/vault-client-secret ubuntu@vault.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@vault.${domain} sudo bash << EOF
-/home/ubuntu/init/vault/runcmd --domain "${domain}" --acme "https://step.${domain}" \
+/home/ubuntu/init/vault/runcmd --domain "${domain}" --subdomain vault --acme "https://step.${domain}" \
   --ldap ldaps://ldap.${domain} --oidc https://keycloak.${domain}:8443/realms/infrastructure \
   --clientsecret /home/ubuntu/init/creds/vault-client-secret --subnet ${subnet},127.0.0.0/8
 EOF
@@ -141,7 +176,12 @@ EOF
 
 echo $SSH_ROLE_ID > ${SCRIPT_DIR}/../creds/ssh_host_role_id
 
-for vm in bind step ldap keycloak vault
+backfill=(bind ldap)
+if [[ "${compact}" != "1" ]]
+then
+  backfill+=(step keycloak vault)
+fi
+for vm in ${backfill[@]}
 do
   scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@${vm}.${domain}:/home/ubuntu/init/creds/
 	ssh ubuntu@${vm}.${domain} bash << EOF
@@ -205,7 +245,7 @@ scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_inter
 ssh ubuntu@mail.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@mail.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@mail.${domain} sudo bash << EOF
-/home/ubuntu/init/mail/runcmd --domain "${domain}" --acme "https://step.${domain}" \
+/home/ubuntu/init/mail/runcmd --domain "${domain}" --subdomain mail --acme "https://step.${domain}" \
   --network ${subnet} --nameserver ${nameserver} --ldap ldaps://ldap.${domain}
 EOF
 
