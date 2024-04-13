@@ -33,7 +33,7 @@ export suffix=$(sed -e 's/\./ /g' <<< ${domain} | xargs printf ",dc=%s" | sed -e
 # packages
 if [[ ! -f /usr/share/keyrings/hashicorp-archive-keyring.gpg ]]
 then
-  wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  wget --progress=dot:giga -O- https://apt.releases.hashicorp.com/gpg | gpg --yes --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 fi
 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 apt-get update && apt-get install -y vault=1.15.6-1 gpg
