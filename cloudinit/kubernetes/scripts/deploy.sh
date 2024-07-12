@@ -95,15 +95,16 @@ metadata:
   namespace: metallb-system
 EOF
 
-# ingress
+# ingress - traefik 2.x (chart <28)
 helm repo add traefik https://traefik.github.io/charts
-helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namespace \
+helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namespace --version v27.0.2 \
   --set providers.kubernetesIngress.publishedService.enabled=true \
   --set ports.ssh.port=2222 \
   --set ports.ssh.expose.default=true \
   --set ports.ssh.exposedPort=22 \
   --set logs.general.level=INFO \
-  --set logs.access.enabled=true
+  --set logs.access.enabled=true \
+  --set service.spec.externalTrafficPolicy=Local # preserve remote ips
 
 # tls
 STEP_CA=$(cat /usr/local/share/ca-certificates/step_root_ca.crt)
