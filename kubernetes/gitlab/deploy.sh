@@ -96,7 +96,8 @@ kubectl wait -n gitlab vaultstaticsecret ldap-password --for=jsonpath='{.status.
 helm repo add gitlab https://charts.gitlab.io/
 
 helm upgrade --install -n gitlab gitlab gitlab/gitlab --wait \
-  --values ${SCRIPT_DIR}/values.yml
+  --values ${SCRIPT_DIR}/values.yml \
+  --version 7.11.2
 
 # wait for external-dns
 while [[ -z "$(dig -4 gitlab.eng.home.arpa @bind.home.arpa +noall +answer)" ]]
