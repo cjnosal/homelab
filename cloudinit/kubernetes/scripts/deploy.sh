@@ -501,7 +501,7 @@ spec:
   - system:authenticated
   request: $(base64 -w 0 < /home/ubuntu/init/creds/bootstrap.csr)
   signerName: kubernetes.io/kube-apiserver-client
-  expirationSeconds: 7200
+  expirationSeconds: 14400
   usages:
   - digital signature
   - key encipherment
