@@ -77,6 +77,42 @@ else
   password=$(cat /root/user.passwd)
 fi
 
+if [[ ! -f /root/alloy.passwd ]]
+then
+  alloycred=$(generatecred)
+  echo $alloycred > /root/alloy.passwd
+  chmod 400 /root/alloy.passwd
+else
+  alloycred=$(cat /root/alloy.passwd)
+fi
+
+if [[ ! -f /root/authelia.passwd ]]
+then
+  autheliacred=$(generatecred)
+  echo $autheliacred > /root/authelia.passwd
+  chmod 400 /root/authelia.passwd
+else
+  autheliacred=$(cat /root/authelia.passwd)
+fi
+
+if [[ ! -f /root/loki.passwd ]]
+then
+  lokicred=$(generatecred)
+  echo $lokicred > /root/loki.passwd
+  chmod 400 /root/loki.passwd
+else
+  lokicred=$(cat /root/loki.passwd)
+fi
+
+if [[ ! -f /root/grafana.passwd ]]
+then
+  grafanacred=$(generatecred)
+  echo $grafanacred > /root/grafana.passwd
+  chmod 400 /root/grafana.passwd
+else
+  grafanacred=$(cat /root/grafana.passwd)
+fi
+
 # packages
 
 debconf-set-selections <<EOF
@@ -128,6 +164,12 @@ addldapgroup ldap-admin
 addldapgroup k8s-core-admin
 addldapgroup k8s-run-admin
 addldapgroup minio-admin
+addldapgroup grafana-admin
+addldapgroup grafana-editor
+
+# authelia access to loki api
+addldapgroup loki-write
+addldapgroup loki-read
 
 # initial admin
 
@@ -138,6 +180,12 @@ email=$(yq .email $userfile)
 
 addldapuser bootstrap Boot Strap bootstrap@${domain}
 addldapuser $username $givenname $surname $email
+
+addldapuser alloy Grafana Alloy alloy@${domain}
+addldapuser loki Grafana Loki loki@${domain}
+addldapuser grafana Grafana Grafana grafana@${domain}
+
+addldapsystem authelia Authelia
 
 # mail
 # postmaster/abuse mailbox
@@ -161,10 +209,22 @@ do
   addldapusertogroup $admin k8s-core-admin
   addldapusertogroup $admin k8s-run-admin
   addldapusertogroup $admin minio-admin
+  addldapusertogroup $admin loki-write
+  addldapusertogroup $admin loki-read
+  addldapusertogroup $admin grafana-admin
+  addldapusertogroup $admin grafana-editor
 done
+
+addldapusertogroup alloy loki-write
+addldapusertogroup grafana loki-read
 
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $bootstrapcred -S uid=bootstrap,ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $password -S uid=${username},ou=people,${suffix}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $alloycred -S uid=alloy,ou=people,${suffix}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $lokicred -S uid=loki,ou=people,${suffix}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $grafanacred -S uid=grafana,ou=people,${suffix}
+
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $autheliacred -S uid=authelia,ou=systems,${suffix}
 
 popd
 

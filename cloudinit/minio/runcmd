@@ -114,3 +114,12 @@ systemctl is-active minio --wait
 mc alias set minio https://${subdomain}.${domain}:9000 minio-root $admincred
 
 mc idp ldap policy attach minio --group=cn=minio-admin,ou=groups,${suffix} consoleAdmin
+
+
+# loki
+mc mb minio/loki-chunks
+mc mb minio/loki-admin
+mc mb minio/loki-ruler
+
+mc admin policy create minio loki-system conf/loki-system.json
+mc idp ldap policy attach minio --user=uid=loki,ou=people,${suffix} loki-system

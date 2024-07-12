@@ -1,0 +1,24 @@
+{
+   "Version" : "2012-10-17",
+   "Statement" : [
+      {
+         "Effect" : "Allow",
+         "Action" : [ "s3:*" ],
+         "Resource" : "arn:aws:s3:::loki-chunks/*"
+      },
+      {
+         "Effect" : "Allow",
+         "Action" : [ "s3:*" ],
+         "Resource" : "arn:aws:s3:::loki-admin/*"
+      },
+      {
+         "Effect" : "Allow",
+         "Action" : [ "s3:*" ],
+         "Resource" : "arn:aws:s3:::loki-ruler/*"
+      },
+      {
+         "Effect" : "Allow",
+         "Action" : [ "admin:CreateServiceAccount" ]
+      }
+   ]
+}

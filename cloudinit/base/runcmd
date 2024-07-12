@@ -11,7 +11,7 @@ cp include/argshelper /usr/local/include/
 debconf-set-selections <<EOF
 debconf debconf/frontend select Noninteractive
 EOF
-apt-get install -y jq debian-keyring debian-archive-keyring apt-transport-https curl ed
+apt-get install -y jq debian-keyring debian-archive-keyring apt-transport-https curl ed rsyslog
 
 # user
 id -u ops || adduser --home /home/ops --shell /bin/bash --disabled-password --gecos "Ops Team" ops
@@ -43,6 +43,28 @@ HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
 EOC
 
 	sudo systemctl restart sshd
+fi
+
+# alloy log export
+mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+
+# apt.grafana.com unexpected package size errors
+if ! apt-get update
+then
+	wget https://github.com/grafana/alloy/releases/download/v1.1.0/alloy-1.1.0-1.amd64.deb
+	dpkg -i alloy-1.1.0-1.amd64.deb
+else
+	apt-get install alloy
+fi
+
+mkdir -p /etc/alloy
+cp conf/config.alloy /etc/alloy/config.alloy
+
+if [[ -f /home/ubuntu/init/creds/alloy.passwd ]]
+then
+	enablealloy.sh
 fi
 
 popd

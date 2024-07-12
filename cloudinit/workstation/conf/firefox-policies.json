@@ -46,6 +46,14 @@
       {
         "name": "Minio",
         "url": "https://${minio}"
+      },
+      {
+        "name": "Grafana",
+        "url": "https://${grafana}"
+      },
+      {
+        "name": "Authelia",
+        "url": "https://${authelia}"
       }
     ]
   }

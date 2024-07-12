@@ -38,6 +38,30 @@ workstation_img=https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloud
 export template_name=$(basename $img .img)
 workstation_template_name=$(basename $workstation_img .img)
 
+function copybaseconf {
+  TARGET_HOST=$1
+
+  ssh ubuntu@${TARGET_HOST}.${domain} mkdir -p /home/ubuntu/init/creds/
+  scp -r ${SCRIPT_DIR}/../cloudinit/base ubuntu@${TARGET_HOST}.${domain}:/home/ubuntu/init
+
+  # TLS CA
+  if [[ -f ${SCRIPT_DIR}/../creds/step_root_ca.crt ]]
+  then
+    scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@${TARGET_HOST}.${domain}:/home/ubuntu/init/certs
+  fi
+
+  # SSH CA
+  if [[ -f ${SCRIPT_DIR}/../creds/ssh_host_role_id ]]
+  then
+    scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@${TARGET_HOST}.${domain}:/home/ubuntu/init/creds/
+  fi
+
+  # Alloy
+  if [[ -f ${SCRIPT_DIR}/../creds/alloy.passwd ]]
+  then
+    scp -r ${SCRIPT_DIR}/../creds/alloy.passwd ubuntu@${TARGET_HOST}.${domain}:/home/ubuntu/init/creds/
+  fi
+}
 
 # init
 
@@ -109,8 +133,8 @@ sudo cp ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_inte
 sudo update-ca-certificates
 
 ${SCRIPT_DIR}/preparevm --vmname ldap
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap ${SCRIPT_DIR}/../cloudinit/user.yml ubuntu@ldap.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@ldap.${domain}:/home/ubuntu/init/certs
+copybaseconf ldap
+scp -r ${SCRIPT_DIR}/../cloudinit/ldap ${SCRIPT_DIR}/../cloudinit/user.yml ubuntu@ldap.${domain}:/home/ubuntu/init
 ssh ubuntu@ldap.${domain} sudo bash << EOF
 /home/ubuntu/init/ldap/runcmd --domain "${domain}" --subdomain ldap --acme "https://step.${domain}" \
   --userfile /home/ubuntu/init/user.yml
@@ -122,19 +146,78 @@ EOF
 )
 echo $BOOTSTRAP_PASSWORD > ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd
 
+ALLOY_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/alloy.passwd
+sudo rm /root/alloy.passwd
+EOF
+)
+echo $ALLOY_PASSWORD > ${SCRIPT_DIR}/../creds/alloy.passwd
+
+AUTHELIA_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/authelia.passwd
+sudo rm /root/authelia.passwd
+EOF
+)
+echo $AUTHELIA_PASSWORD > ${SCRIPT_DIR}/../creds/authelia.passwd
+
+LOKI_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/loki.passwd
+sudo rm /root/loki.passwd
+EOF
+)
+echo $LOKI_PASSWORD > ${SCRIPT_DIR}/../creds/loki.passwd
+
+GRAFANA_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/grafana.passwd
+sudo rm /root/grafana.passwd
+EOF
+)
+echo $GRAFANA_PASSWORD > ${SCRIPT_DIR}/../creds/grafana.passwd
+
+# backfill alloy cred
+backfill=(bind ldap)
+if [[ "${compact}" != "1" ]]
+then
+  backfill+=(step)
+fi
+for vm in ${backfill[@]}
+do
+  scp -r ${SCRIPT_DIR}/../creds/alloy.passwd ubuntu@${vm}.${domain}:/home/ubuntu/init/creds/
+  ssh ubuntu@${vm}.${domain} bash << EOF
+set -euo pipefail
+sudo enablealloy.sh
+EOF
+done
+
+
 if [[ "${compact}" == "1" ]]
 then
   aliashost base keycloak
 else
   ${SCRIPT_DIR}/preparevm --vmname keycloak -- --disk 8
 fi
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/keycloak ubuntu@keycloak.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@keycloak.${domain}:/home/ubuntu/init/certs
+copybaseconf keycloak
+scp -r ${SCRIPT_DIR}/../cloudinit/keycloak ubuntu@keycloak.${domain}:/home/ubuntu/init
 ssh ubuntu@keycloak.${domain} sudo bash << EOF
 /home/ubuntu/init/keycloak/runcmd --domain "${domain}" --subdomain keycloak --acme "https://step.${domain}" \
   --ldap ldaps://ldap.${domain} --mail mail.${domain}
 EOF
 KEYCLOAK_ADMIN_PASSWD=$(ssh -o LogLevel=error ubuntu@keycloak.${domain} sudo cat /root/keycloak_admin.passwd)
+
+if [[ "${compact}" == "1" ]]
+then
+  aliashost base authelia
+else
+  ${SCRIPT_DIR}/preparevm --vmname authelia
+fi
+copybaseconf authelia
+scp -r ${SCRIPT_DIR}/../cloudinit/authelia ubuntu@authelia.${domain}:/home/ubuntu/init
+scp -r ${SCRIPT_DIR}/../creds/authelia.passwd ubuntu@authelia.${domain}:/home/ubuntu/init/creds/
+ssh ubuntu@authelia.${domain} sudo bash << EOF
+
+/home/ubuntu/init/authelia/runcmd
+
+EOF
 
 # vault oidc login
 ssh -o LogLevel=error ubuntu@keycloak.${domain} bash > ${SCRIPT_DIR}/../creds/vault-client-secret << EOF
@@ -151,9 +234,8 @@ then
 else
   ${SCRIPT_DIR}/preparevm --vmname vault
 fi
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/vault ubuntu@vault.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@vault.${domain}:/home/ubuntu/init/certs
-ssh ubuntu@vault.${domain} mkdir -p /home/ubuntu/init/creds/
+copybaseconf vault
+scp -r ${SCRIPT_DIR}/../cloudinit/vault ubuntu@vault.${domain}:/home/ubuntu/init
 scp -r ${SCRIPT_DIR}/../creds/vault-client-secret ubuntu@vault.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@vault.${domain} sudo bash << EOF
 /home/ubuntu/init/vault/runcmd --domain "${domain}" --subdomain vault --acme "https://step.${domain}" \
@@ -176,7 +258,7 @@ EOF
 
 echo $SSH_ROLE_ID > ${SCRIPT_DIR}/../creds/ssh_host_role_id
 
-backfill=(bind ldap)
+backfill=(bind ldap authelia)
 if [[ "${compact}" != "1" ]]
 then
   backfill+=(step keycloak vault)
@@ -226,24 +308,20 @@ sudo systemctl restart step-ca
 EOF
 
 ${SCRIPT_DIR}/preparevm --vmname workstation -- --cores 4 --memory 16384 --disk 32 --template_name $workstation_template_name
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
+copybaseconf workstation
+scp -r ${SCRIPT_DIR}/../cloudinit/ldap \
   ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
   ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../cloudinit/user.yml \
   ubuntu@workstation.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@workstation.${domain}:/home/ubuntu/init/certs
 scp -r ./kubernetes ubuntu@workstation.${domain}:/home/ubuntu/init/kubernetes
-ssh ubuntu@workstation.${domain} mkdir -p /home/ubuntu/init/creds/
-scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@workstation.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@workstation.${domain} sudo bash << EOF
 /home/ubuntu/init/workstation/runcmd --domain "${domain}" --userfile /home/ubuntu/init/user.yml --desktop
 EOF
 
 ${SCRIPT_DIR}/preparevm --vmname mail -- --disk 8 --memory 8192
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/mail \
+copybaseconf mail
+scp -r ${SCRIPT_DIR}/../cloudinit/mail \
   ubuntu@mail.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@mail.${domain}:/home/ubuntu/init/certs
-ssh ubuntu@mail.${domain} mkdir -p /home/ubuntu/init/creds/
-scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@mail.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@mail.${domain} sudo bash << EOF
 /home/ubuntu/init/mail/runcmd --domain "${domain}" --subdomain mail --acme "https://step.${domain}" \
   --network ${subnet} --nameserver ${nameserver} --ldap ldaps://ldap.${domain}
@@ -268,16 +346,14 @@ EOF
 
 # boostrap vm
 ${SCRIPT_DIR}/preparevm --vmname bootstrap -- --disk 8
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/ldap \
+copybaseconf bootstrap
+scp -r ${SCRIPT_DIR}/../cloudinit/ldap \
   ${SCRIPT_DIR}/../cloudinit/keycloak ${SCRIPT_DIR}/../cloudinit/vault \
   ${SCRIPT_DIR}/../cloudinit/workstation ${SCRIPT_DIR}/../kubernetes \
   ${SCRIPT_DIR}/../cloudinit/user.yml \
   ubuntu@bootstrap.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@bootstrap.${domain}:/home/ubuntu/init/certs
 scp -r ./kubernetes ubuntu@bootstrap.${domain}:/home/ubuntu/init/kubernetes
-ssh ubuntu@bootstrap.${domain} mkdir -p /home/ubuntu/init/creds/
-scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
-scp ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+scp ${SCRIPT_DIR}/../creds/ldap_bootstrap.passwd ${SCRIPT_DIR}/../creds/alloy.passwd ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@bootstrap.${domain} sudo bash << EOF
 set -euo pipefail
 /home/ubuntu/init/workstation/runcmd --domain "${domain}"
@@ -309,11 +385,10 @@ EOF
 scp ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/minio_ldap.passwd ${SCRIPT_DIR}/../creds/
 
 ${SCRIPT_DIR}/preparevm --vmname minio -- --data_disk 8
-scp -r ${SCRIPT_DIR}/../cloudinit/base ${SCRIPT_DIR}/../cloudinit/minio \
+copybaseconf minio
+scp -r ${SCRIPT_DIR}/../cloudinit/minio \
   ubuntu@minio.${domain}:/home/ubuntu/init
-scp -r ${SCRIPT_DIR}/../creds/step_root_ca.crt ${SCRIPT_DIR}/../creds/step_intermediate_ca.crt ubuntu@minio.${domain}:/home/ubuntu/init/certs
-ssh ubuntu@minio.${domain} mkdir -p /home/ubuntu/init/creds/
-scp -r ${SCRIPT_DIR}/../creds/ssh_host_role_id ${SCRIPT_DIR}/../creds/vault.env ${SCRIPT_DIR}/../creds/minio_ldap.passwd ubuntu@minio.${domain}:/home/ubuntu/init/creds/
+scp -r ${SCRIPT_DIR}/../creds/minio_ldap.passwd ubuntu@minio.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@minio.${domain} sudo bash << EOF
 /home/ubuntu/init/minio/runcmd --domain "${domain}" --subdomain minio --acme "https://step.${domain}" \
   --ldap ldap.${domain}:636
@@ -366,7 +441,10 @@ ${SCRIPT_DIR}/../cloudinit/kubernetes/create-cluster.sh --cluster run --lb_addre
 fi
 
 # kubernetes deployments
-scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
+scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml \
+  ${SCRIPT_DIR}/../creds/loki.passwd \
+  ${SCRIPT_DIR}/../creds/grafana.passwd \
+  ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@bootstrap.${domain} sudo bash << EOF
 set -euo pipefail
 
@@ -376,11 +454,17 @@ export KUBECONFIG=/home/ubuntu/init/creds/k8s-core-bootstrap-config.yml
 
 user=\$(yq .username /home/ubuntu/init/user.yml)
 
+/home/ubuntu/init/kubernetes/alloy/deploy.sh
+
 /home/ubuntu/init/kubernetes/gitlab/prereqs.sh -all --gitlab_admin \${user}
 /home/ubuntu/init/kubernetes/gitlab/deploy.sh
 
 /home/ubuntu/init/kubernetes/harbor/prereqs.sh -all --harbor_admin \${user}
 /home/ubuntu/init/kubernetes/harbor/deploy.sh
+
+
+/home/ubuntu/init/kubernetes/loki/deploy.sh
+/home/ubuntu/init/kubernetes/grafana/deploy.sh
 
 # randomize the bootstrap user's ldap password (another admin can reset it if the account is needed later)
 source /usr/local/include/ldap.env

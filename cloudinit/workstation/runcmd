@@ -6,7 +6,7 @@ pushd ${SCRIPT_DIR}
 
 # args
 FLAGS=(desktop)
-OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step minio)
+OPTIONS=(domain userfile ldap pve keycloak vault harbor gitlab step minio grafana authelia)
 
 help_this="initialize workstation"
 help_domain="parent domain of this environment"
@@ -20,6 +20,8 @@ help_vault="url of vault host"
 help_harbor="url of harbor host"
 help_gitlab="url of gitlab host"
 help_minio="url of minio host"
+help_grafana="url of grafana host"
+help_authelia="url of authelia host"
 help_desktop="install desktop environment"
 
 
@@ -44,6 +46,8 @@ vault=${vault:-vault.${domain}:8200}
 harbor=${harbor:-harbor.eng.${domain}}
 gitlab=${gitlab:-gitlab.eng.${domain}}
 minio=${minio:-minio.${domain}:9000}
+grafana=${grafana:-grafana.eng.${domain}}
+authelia=${authelia:-authelia.${domain}:9091}
 
 
 # ldap dc components from $domain
@@ -95,7 +99,8 @@ then
   cp conf/thunderbird-policies.json /usr/lib/thunderbird/distribution/policies.json
   mkdir -p /etc/firefox/policies
   sed -e "s|\${pve}|$pve|g" -e "s|\${keycloak}|$keycloak|g" -e "s|\${vault}|$vault|g" \
-    -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  -e "s|\${minio}|$minio|g"  \
+    -e "s|\${harbor}|$harbor|g" -e "s|\${gitlab}|$gitlab|g"  -e "s|\${minio}|$minio|g" \
+    -e "s|\${grafana}|$grafana|g" -e "s|\${authelia}|$authelia|g" \
     conf/firefox-policies.json > /etc/firefox/policies/policies.json
 fi
 
@@ -123,7 +128,7 @@ echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://
 
 apt-get update
 apt-get install -y bind9utils dnsutils jq openjdk-19-jre-headless apache2-utils
-apt-get install -y ldap-utils libpam-ldap libnss-ldap nslcd vault
+apt-get install -y ldap-utils libpam-ldap libnss-ldap nslcd vault expect
 
 if [[ "${desktop}" == "1" ]]
 then

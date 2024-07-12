@@ -1,0 +1,35 @@
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal__hostname"]
+    target_label = "hostname"
+  }
+}
+loki.source.journal "journal" {
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {component = "loki.source.journal"}
+  forward_to = [loki.write.endpoint.receiver]
+}
+
+local.file_match "varlog" {
+  path_targets = [{"__path__" = "/var/log/**/*.log", "__path_exclude__" = "/var/log/journal/**"}]
+}
+loki.source.file "files" {
+  targets    = local.file_match.varlog.targets
+  forward_to = [loki.write.endpoint.receiver]
+}
+
+loki.write "endpoint" {
+  endpoint {
+    url ="https://loki.eng.home.arpa/loki/api/v1/push"
+    basic_auth {
+      username="alloy"
+      password_file="/etc/alloy/alloy.passwd"
+    }
+  }
+}

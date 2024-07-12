@@ -48,6 +48,7 @@ scp -r ${SCRIPT_DIR}/../base ${SCRIPT_DIR}/../kubernetes \
 scp -r ${SCRIPT_DIR}/../../creds/step_root_ca.crt ${SCRIPT_DIR}/../../creds/step_intermediate_ca.crt ubuntu@${mastervm}.${domain}:/home/ubuntu/init/certs
 ssh ubuntu@${mastervm}.${domain} mkdir -p /home/ubuntu/init/creds/
 scp -r ${SCRIPT_DIR}/../../creds/ssh_host_role_id ${SCRIPT_DIR}/../../creds/vault.env ubuntu@${mastervm}.${domain}:/home/ubuntu/init/creds/
+scp -r ${SCRIPT_DIR}/../../creds/alloy.passwd ubuntu@${mastervm}.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@${mastervm}.${domain} sudo bash << EOF
 /home/ubuntu/init/kubernetes/runcmd --domain ${domain} --node master --version ${version} --acme ${acme}
 EOF
@@ -74,6 +75,7 @@ do
   scp -r ${SCRIPT_DIR}/../../creds/ssh_host_role_id ${SCRIPT_DIR}/../../creds/vault.env ubuntu@${workervm}.${domain}:/home/ubuntu/init/creds/
   ssh ubuntu@${workervm}.${domain} mkdir -p /home/ubuntu/init/creds/
   scp -r ${SCRIPT_DIR}/../../creds/k8s-${cluster}-join-cmd ubuntu@${workervm}.${domain}:/home/ubuntu/init/creds/joincmd
+  scp -r ${SCRIPT_DIR}/../../creds/alloy.passwd ubuntu@${workervm}.${domain}:/home/ubuntu/init/creds/
   ssh ubuntu@${workervm}.${domain} sudo bash << EOF
   chmod a+rx /home/ubuntu/init/creds/joincmd
   /home/ubuntu/init/kubernetes/runcmd --domain ${domain} --node worker --version ${version} --acme ${acme}

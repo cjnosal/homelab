@@ -24,6 +24,6 @@ then
   access_key=$(generatecred -length 20)
   secret_key=$(generatecred)
   echo "enter ldap credentials to request minio access key"
-  mc idp ldap accesskey create --login https://${minio} --access-key $access_key --secret-key $secret_key | grep -v Key # mc writes prompts and creds to stdout
+  mc idp ldap accesskey create-with-login https://${minio} --access-key $access_key --secret-key $secret_key | grep -v Key # mc writes prompts and creds to stdout
   mc alias set minio https://${minio} $access_key $secret_key
 fi

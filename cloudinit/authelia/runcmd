@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+pushd ${SCRIPT_DIR}
+
+# args
+OPTIONS=()
+
+help_this="initialize authelia reverse proxy"
+
+../base/runcmd
+
+curl https://apt.authelia.com/organization/signing.asc | sudo apt-key add -
+echo "deb https://apt.authelia.com/stable/debian/debian/ all main" | sudo tee /etc/apt/sources.list.d/authelia-stable-debian.list
+sudo apt-get update
+
+apt install authelia
+
+initcertbot --acme https://step.home.arpa --group root \
+  --san authelia.home.arpa --fullchain /etc/ssl/certs/tls.crt --key /etc/ssl/private/tls.key
+
+ENC_KEY=$(generatecred)
+LDAP_PASSWORD=$(cat /home/ubuntu/init/creds/authelia.passwd)
+
+mkdir -p /etc/authelia/config
+
+cat >  /etc/authelia/configuration.yml << EOF
+server:
+  tls:
+    key: /etc/ssl/private/tls.key
+    certificate: /etc/ssl/certs/tls.crt
+authentication_backend:
+  ldap:
+    implementation: custom
+    address: ldaps://ldap.home.arpa
+    base_dn: 'dc=home,dc=arpa'
+    additional_users_dn: 'ou=people'
+    users_filter: '(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=inetOrgPerson))'
+    additional_groups_dn: 'ou=groups'
+    groups_filter: '(&(objectClass=groupOfNames)(member={dn}))'
+    permit_unauthenticated_bind: false
+    user: "uid=authelia,ou=systems,dc=home,dc=arpa"
+    password: ${LDAP_PASSWORD}
+    attributes:
+      username: uid
+      mail: mail
+      display_name: displayName
+      group_name: cn
+  password_reset:
+    disable: true
+access_control:
+  networks:
+  - name: homelab
+    networks:
+    - 192.168.2.0/23
+  - name: k8s
+    networks:
+    - 10.244.0.0/8
+  rules:
+  - domain: loki.eng.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:loki-write']
+    methods:
+    - 'POST'
+    networks:
+    - homelab
+    - k8s
+  - domain: loki.eng.home.arpa
+    policy: bypass
+    methods:
+    - 'GET'
+    - 'HEAD'
+    resources:
+    - '^/?$'
+    networks:
+    - homelab
+    - k8s
+  - domain: loki.eng.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:loki-read']
+    methods:
+    - 'GET'
+    - 'HEAD'
+    networks:
+    - homelab
+    - k8s
+  - domain: authelia.home.arpa
+    policy: bypass
+    networks:
+    - homelab
+    - k8s
+session:
+  cookies:
+  - name: authelia_session
+    domain: home.arpa
+    authelia_url: https://authelia.home.arpa
+storage:
+  local:
+    path: /etc/authelia/config/db.sqlite3
+  encryption_key: ${ENC_KEY}
+notifier:
+  filesystem:
+    filename: /var/log/authelia-notifications.log
+  disable_startup_check: true
+log:
+  level: info
+EOF
+
+systemctl restart authelia
+systemctl is-active authelia --wait

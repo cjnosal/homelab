@@ -1,0 +1,66 @@
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+      cert-manager.io/cluster-issuer: step-issuer
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  hosts:
+  - grafana.eng.home.arpa
+  tls:
+  - secretName: grafana-tls
+    hosts:
+    - grafana.eng.home.arpa
+extraSecretMounts:
+- name: ca-bundle
+  mountPath: "/etc/ssl/certs"
+  secretName: ca-bundle
+grafana.ini:
+  server:
+    domain: grafana.eng.home.arpa
+  auth.ldap:
+    enabled: true
+    allow_sign_up: true
+    config_file: /etc/grafana/ldap.toml
+ldap:
+  enabled: true
+  # existingSecret: (if using bind cred)
+  config: |-
+    verbose_logging = false
+
+    [[servers]]
+    host = "ldap.home.arpa"
+    port = 636
+    use_ssl = true
+    ssl_skip_verify = false
+    search_filter = "(uid=%s)"
+    search_base_dns = ["ou=people,dc=home,dc=arpa"]
+    #bind_dn = "uid=cnosal,ou=people,dc=home,dc=arpa"
+    #bind_password = 
+
+    [servers.attributes]
+    name = "givenName"
+    surname = "sn"
+    username = "uid"
+    member_of = "memberOf"
+    email =  "mail"
+
+    [[servers.group_mappings]]
+    group_dn = "cn=grafana-admin,ou=groups,dc=home,dc=arpa"
+    org_role = "Admin"
+    grafana_admin = true
+
+    [[servers.group_mappings]]
+    group_dn = "cn=grafana-editor,ou=groups,dc=home,dc=arpa"
+    org_role = "Editor"
+    grafana_admin = false
+
+    [[servers.group_mappings]]
+    group_dn = "*"
+    org_role = "Viewer"
+persistence:
+  enabled: true
+sidecar:
+  datasources:
+    enabled: true
+    logLevel: INFO

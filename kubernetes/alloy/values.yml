@@ -1,0 +1,68 @@
+cluster:
+  name: ${cluster}
+metrics:
+  enabled: false
+  cost:
+    enabled: false
+opencost:
+  enabled: false
+externalServices:
+  loki:
+    secret:
+      name: loki
+      namespace: monitoring
+      create: false
+    host: https://loki.eng.home.arpa
+    tls:
+      ca_file: /etc/ssl/certs/root-certs.pem
+alloy:
+  alloy:
+    mounts:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          mountPath: /etc/kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          mountPath: /etc/ssl/certs
+  controller:
+    volumes:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          configMap:
+            name: kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          configMap:
+            name: ca-bundle
+alloy-logs:
+  alloy:
+    mounts:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          mountPath: /etc/kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          mountPath: /etc/ssl/certs
+  controller:
+    volumes:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          configMap:
+            name: kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          configMap:
+            name: ca-bundle
+alloy-events:
+  alloy:
+    mounts:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          mountPath: /etc/kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          mountPath: /etc/ssl/certs
+  controller:
+    volumes:
+      extra:
+        - name: kubernetes-monitoring-telemetry
+          configMap:
+            name: kubernetes-monitoring-telemetry
+        - name: ca-bundle
+          configMap:
+            name: ca-bundle

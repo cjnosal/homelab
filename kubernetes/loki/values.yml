@@ -1,0 +1,93 @@
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: 2024-04-01
+        object_store: s3
+        store: tsdb
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  storage:
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-ruler
+      admin: loki-admin
+    type: 's3'
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-ruler
+      admin: loki-admin
+    s3:
+      secretAccessKey: ${S3_LOKI_SECRET_ACCESS_KEY}
+      accessKeyId: ${S3_LOKI_ACCESS_KEY_ID}
+      s3ForcePathStyle: true
+      insecure: false
+      http_config:
+        ca_file: /certs/ca.crt
+write:
+  replicas: 1
+  extraVolumes:
+  - name: certs
+    secret:
+      secretName: home.arpa
+  extraVolumeMounts:
+  - name: certs
+    mountPath: /certs
+  extraArgs:
+  - '-config.expand-env=true'
+  extraEnvFrom:
+  - secretRef:
+      name: s3-credentials
+read:
+  replicas: 1
+  extraVolumes:
+  - name: certs
+    secret:
+      secretName: home.arpa
+  extraVolumeMounts:
+  - name: certs
+    mountPath: /certs
+  extraArgs:
+  - '-config.expand-env=true'
+  extraEnvFrom:
+  - secretRef:
+      name: s3-credentials
+backend:
+  replicas: 1
+  extraVolumes:
+  - name: certs
+    secret:
+      secretName: home.arpa
+  extraVolumeMounts:
+  - name: certs
+    mountPath: /certs
+  extraArgs:
+  - '-config.expand-env=true'
+  extraEnvFrom:
+  - secretRef:
+      name: s3-credentials
+gateway:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: step-issuer
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.middlewares: 'loki-forwardauth-authelia@kubernetescrd'
+    hosts:
+    - host: loki.eng.home.arpa
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: loki-tls
+      hosts:
+      - loki.eng.home.arpa
+tableManager:
+  retention_deletes_enabled: true
+  retention_period: 744h
