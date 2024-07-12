@@ -49,7 +49,8 @@ helm repo add harbor https://helm.goharbor.io
 
 helm upgrade --install harbor harbor/harbor --namespace harbor  --wait \
   --values ${SCRIPT_DIR}/values.yml \
-  --set-string database.internal.password=${DB_CRED}
+  --set-string database.internal.password=${DB_CRED} \
+  --version 1.14.2
 
 # wait for external-dns
 while [[ -z "$(dig -4 harbor.eng.home.arpa @bind.home.arpa +noall +answer)" ]]
