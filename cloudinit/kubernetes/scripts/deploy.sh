@@ -449,7 +449,8 @@ kubectl label namespace vault-secrets-operator-system 'smallstep.com/inject'="en
 helm upgrade --install vault-secrets-operator hashicorp/vault-secrets-operator -n vault-secrets-operator-system --wait \
   --set "defaultVaultConnection.enabled=true" \
   --set "defaultVaultConnection.address=${vault}" \
-  --set "defaultVaultConnection.caCertSecret=${domain}"
+  --set "defaultVaultConnection.caCertSecret=${domain}" \
+  --version 0.6.0
 
 
 # Allow admins full access
