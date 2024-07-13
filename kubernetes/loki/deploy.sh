@@ -24,7 +24,6 @@ ACCESS_KEY=$(generatecred --length 20)
 lokicred=$(cat /home/ubuntu/init/creds/loki.passwd)
 s3=minio.home.arpa:9000
 
-# TODO spawn echoes the resolved values
 cat > login.exp << EOF
 #!/usr/bin/env expect
 set timeout 30
