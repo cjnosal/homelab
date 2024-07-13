@@ -95,7 +95,7 @@ kubectl wait -n gitlab vaultstaticsecret ldap-password --for=jsonpath='{.status.
 
 helm repo add gitlab https://charts.gitlab.io/
 
-helm upgrade --install -n gitlab gitlab gitlab/gitlab --wait \
+helm upgrade --install -n gitlab gitlab gitlab/gitlab --wait --timeout 10m \
   --values ${SCRIPT_DIR}/values.yml \
   --version 7.11.2
 
