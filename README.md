@@ -68,6 +68,8 @@ then run bootstrap.sh
 * SSH CA (Vault)
 * Secret management (Vault)
 * Mail (postfix + dovecot + spamassassin + clamav + sieve)
+* Object storage (Minio)
+* Authenticating Proxy (Authelia)
 * Kubernetes
     * flannel
     * metrics-server
@@ -77,7 +79,12 @@ then run bootstrap.sh
     * openebs
     * pinniped
     * external-dns
+    * alloy
 * Kubernetes deployments
     * Harbor
     * Gitlab
-* Workstation (Lubuntu + xrdp + firefox + thunderbird)
+    * Loki
+    * Grafana
+* Workstation
+    * Desktop: Lubuntu + xrdp + firefox + thunderbird
+    * Dev: golang + docker + sublime text
