@@ -110,5 +110,6 @@ log:
   level: info
 EOF
 
+systemctl enable authelia
 systemctl restart authelia
 systemctl is-active authelia --wait
