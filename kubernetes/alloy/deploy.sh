@@ -19,9 +19,9 @@ metadata:
     smallstep.com/inject: enabled
 EOF
 
-LOKI_PASSWORD=$(cat /home/ubuntu/init/creds/alloy.passwd)
+ALLOY_PASSWORD=$(cat /home/ubuntu/init/creds/alloy.passwd)
 ytt -f ${SCRIPT_DIR}/secrets.yml \
-  -v loki_password="${LOKI_PASSWORD}" \
+  -v alloy_password="${ALLOY_PASSWORD}" \
   | kubectl apply -n monitoring -f-
 
 helm upgrade --install grafana-k8s-monitoring --atomic --timeout 300s  grafana/k8s-monitoring --namespace monitoring  --values ${SCRIPT_DIR}/values.yml --wait \

@@ -88,6 +88,49 @@ access_control:
     networks:
     - homelab
     - k8s
+  - domain: mimir.eng.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:mimir-write']
+    methods:
+    - 'POST'
+    networks:
+    - homelab
+    - k8s
+  - domain: mimir.eng.home.arpa
+    policy: bypass
+    methods:
+    - 'GET'
+    - 'HEAD'
+    resources:
+    - '^/?$'
+    networks:
+    - homelab
+    - k8s
+  - domain: mimir.eng.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:mimir-read']
+    methods:
+    - 'GET'
+    - 'HEAD'
+    networks:
+    - homelab
+    - k8s
+  - domain: mimir.eng.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:mimir-read']
+    methods:
+    - 'POST'
+    resources:
+    - '^/prometheus/api/v1/query$'
+    - '^/prometheus/api/v1/query_range$'
+    - '^/prometheus/api/v1/labels$'
+    - '^/prometheus/api/v1/series$'
+    networks:
+    - homelab
+    - k8s
   - domain: authelia.home.arpa
     policy: bypass
     networks:

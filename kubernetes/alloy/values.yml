@@ -1,7 +1,7 @@
 cluster:
   name: ${cluster}
 metrics:
-  enabled: false
+  enabled: true
   cost:
     enabled: false
 opencost:
@@ -13,6 +13,16 @@ externalServices:
       namespace: monitoring
       create: false
     host: https://loki.eng.home.arpa
+    tls:
+      ca_file: /etc/ssl/certs/root-certs.pem
+  prometheus:
+    secret:
+      name: mimir
+      namespace: monitoring
+      create: false
+    host: https://mimir.eng.home.arpa
+    queryEndpoint: /prometheus/api/v1/query
+    writeEndpoint: /api/v1/push
     tls:
       ca_file: /etc/ssl/certs/root-certs.pem
 alloy:

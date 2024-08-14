@@ -22,8 +22,8 @@ helm repo update
 grafanacred=$(cat /home/ubuntu/init/creds/grafana.passwd)
 
 ytt -f ${SCRIPT_DIR}/secrets.yml \
-  -v loki_user="grafana" \
-  -v loki_password="${grafanacred}" \
+  -v grafana_user="grafana" \
+  -v grafana_password="${grafanacred}" \
   | kubectl apply -n monitoring -f-
 
 

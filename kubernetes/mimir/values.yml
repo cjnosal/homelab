@@ -1,0 +1,266 @@
+alertmanager:
+  persistentVolume:
+    enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 1.4G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  statefulSet:
+    enabled: true
+
+compactor:
+  persistentVolume:
+    size: 20Gi
+  resources:
+    limits:
+      memory: 2.1G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+distributor:
+  replicas: 2
+  resources:
+    limits:
+      memory: 5.7G
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+ingester:
+  persistentVolume:
+    size: 50Gi
+  replicas: 2
+  resources:
+    limits:
+      memory: 12G
+    requests:
+      cpu: 350m
+      memory: 256Mi
+  topologySpreadConstraints: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: target # support for enterprise.legacyLabels
+                operator: In
+                values:
+                  - ingester
+          topologyKey: 'kubernetes.io/hostname'
+
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - ingester
+          topologyKey: 'kubernetes.io/hostname'
+
+  # zoneAwareReplication:
+  #   topologyKey: 'kubernetes.io/hostname'
+
+admin-cache:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+chunks-cache:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+index-cache:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+metadata-cache:
+  enabled: true
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+results-cache:
+  enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+global:
+  extraEnvFrom:
+    - secretRef:
+        name: s3-credentials
+  extraVolumes:
+  - name: certs
+    secret:
+      secretName: home.arpa
+  extraVolumeMounts:
+  - name: certs
+    mountPath: /certs
+  podAnnotations:
+    bucketSecretVersion: "0"
+
+minio:
+  enabled: false
+
+mimir:
+  structuredConfig:
+    common:
+      storage:
+        backend: s3
+        s3:
+          endpoint: # minio.home.arpa:9000
+          secret_access_key: "${S3_MIMIR_SECRET_ACCESS_KEY}" # This is a secret injected via an environment variable
+          access_key_id: "${S3_MIMIR_ACCESS_KEY_ID}" # This is a secret injected via an environment variable
+          http:
+            tls_ca_path:  /certs/ca.crt
+
+    blocks_storage:
+      s3:
+        bucket_name: mimir-blocks
+    alertmanager_storage:
+      s3:
+        bucket_name: mimir-alertmanager
+    ruler_storage:
+      s3:
+        bucket_name: mimir-ruler
+
+overrides_exporter:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+querier:
+  replicas: 1
+  resources:
+    limits:
+      memory: 5.6G
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+query_frontend:
+  replicas: 1
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+ruler:
+  replicas: 1
+  resources:
+    limits:
+      memory: 2.8G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+store_gateway:
+  persistentVolume:
+    size: 10Gi
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.1G
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  topologySpreadConstraints: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: target # support for enterprise.legacyLabels
+                operator: In
+                values:
+                  - store-gateway
+          topologyKey: 'kubernetes.io/hostname'
+
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - store-gateway
+          topologyKey: 'kubernetes.io/hostname'
+  # zoneAwareReplication:
+  #   topologyKey: 'kubernetes.io/hostname'
+
+nginx:
+  replicas: 1
+  resources:
+    limits:
+      memory: 731Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Grafana Enterprise Metrics feature related
+admin_api:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+gateway:
+  enabledNonEnterprise: true
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: step-issuer
+      traefik.ingress.kubernetes.io/router.tls: "true"
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.middlewares: 'mimir-forwardauth-authelia@kubernetescrd'
+    hosts:
+    - host: mimir.eng.home.arpa
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: mimir-tls
+      hosts:
+      - mimir.eng.home.arpa
+  replicas: 1
+  resources:
+    limits:
+      memory: 731Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi

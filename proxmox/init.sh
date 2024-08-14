@@ -167,6 +167,13 @@ EOF
 )
 echo $LOKI_PASSWORD > ${SCRIPT_DIR}/../creds/loki.passwd
 
+MIMIR_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
+sudo cat /root/mimir.passwd
+sudo rm /root/mimir.passwd
+EOF
+)
+echo $MIMIR_PASSWORD > ${SCRIPT_DIR}/../creds/mimir.passwd
+
 GRAFANA_PASSWORD=$(ssh -o LogLevel=error ubuntu@ldap.${domain} bash << EOF
 sudo cat /root/grafana.passwd
 sudo rm /root/grafana.passwd
@@ -443,6 +450,7 @@ fi
 # kubernetes deployments
 scp ${SCRIPT_DIR}/../creds/k8s-core-bootstrap-config.yml \
   ${SCRIPT_DIR}/../creds/loki.passwd \
+  ${SCRIPT_DIR}/../creds/mimir.passwd \
   ${SCRIPT_DIR}/../creds/grafana.passwd \
   ubuntu@bootstrap.${domain}:/home/ubuntu/init/creds/
 ssh ubuntu@bootstrap.${domain} sudo bash << EOF
@@ -464,6 +472,7 @@ user=\$(yq .username /home/ubuntu/init/user.yml)
 
 
 /home/ubuntu/init/kubernetes/loki/deploy.sh
+/home/ubuntu/init/kubernetes/mimir/deploy.sh
 /home/ubuntu/init/kubernetes/grafana/deploy.sh
 
 # randomize the bootstrap user's ldap password (another admin can reset it if the account is needed later)

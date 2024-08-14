@@ -104,6 +104,15 @@ else
   lokicred=$(cat /root/loki.passwd)
 fi
 
+if [[ ! -f /root/mimir.passwd ]]
+then
+  mimircred=$(generatecred)
+  echo $mimircred > /root/mimir.passwd
+  chmod 400 /root/mimir.passwd
+else
+  mimircred=$(cat /root/mimir.passwd)
+fi
+
 if [[ ! -f /root/grafana.passwd ]]
 then
   grafanacred=$(generatecred)
@@ -170,6 +179,8 @@ addldapgroup grafana-editor
 # authelia access to loki api
 addldapgroup loki-write
 addldapgroup loki-read
+addldapgroup mimir-write
+addldapgroup mimir-read
 
 # initial admin
 
@@ -183,6 +194,7 @@ addldapuser $username $givenname $surname $email
 
 addldapuser alloy Grafana Alloy alloy@${domain}
 addldapuser loki Grafana Loki loki@${domain}
+addldapuser mimir Grafana Mimir mimir@${domain}
 addldapuser grafana Grafana Grafana grafana@${domain}
 
 addldapsystem authelia Authelia
@@ -211,17 +223,22 @@ do
   addldapusertogroup $admin minio-admin
   addldapusertogroup $admin loki-write
   addldapusertogroup $admin loki-read
+  addldapusertogroup $admin mimir-write
+  addldapusertogroup $admin mimir-read
   addldapusertogroup $admin grafana-admin
   addldapusertogroup $admin grafana-editor
 done
 
 addldapusertogroup alloy loki-write
+addldapusertogroup alloy mimir-write
 addldapusertogroup grafana loki-read
+addldapusertogroup grafana mimir-read
 
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $bootstrapcred -S uid=bootstrap,ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $password -S uid=${username},ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $alloycred -S uid=alloy,ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $lokicred -S uid=loki,ou=people,${suffix}
+ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $mimircred -S uid=mimir,ou=people,${suffix}
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $grafanacred -S uid=grafana,ou=people,${suffix}
 
 ldappasswd  -x -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PW" -s $autheliacred -S uid=authelia,ou=systems,${suffix}

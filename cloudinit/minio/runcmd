@@ -123,3 +123,11 @@ mc mb minio/loki-ruler
 
 mc admin policy create minio loki-system conf/loki-system.json
 mc idp ldap policy attach minio --user=uid=loki,ou=people,${suffix} loki-system
+
+# mimir
+mc mb minio/mimir-blocks
+mc mb minio/mimir-alertmanager
+mc mb minio/mimir-ruler
+
+mc admin policy create minio mimir-system conf/mimir-system.json
+mc idp ldap policy attach minio --user=uid=mimir,ou=people,${suffix} mimir-system
