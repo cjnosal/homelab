@@ -57,7 +57,7 @@ access_control:
     - 192.168.2.0/23
   - name: k8s
     networks:
-    - 10.244.0.0/8
+    - 10.244.0.0/16
   rules:
   - domain: loki.eng.home.arpa
     policy: one_factor
