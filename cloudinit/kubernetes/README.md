@@ -70,9 +70,41 @@ ClusterIssuers can be referenced via Certificate spec or ingress annotation:
 
 A kind cluster is created using Nvidia configuration and binaries to expose 'nvidia.com/gpu' resources to the cluster.
 
-### Prequisite
 
-The host's docker daemon must be configured to use the nvidia container toolkit and runtime. Run gpu/prepare-node on the host if needed.
+### Prerequisite
+
+1. The host's docker daemon must be configured to use the nvidia container toolkit and runtime. Run gpu/prepare-node on the host if needed.
+2. TSIG key set up for dns01 challenges
+
+Add a DNS entry for the host, and enable cert-manager to orchestrate dns01 challenges for ollama.home.arpa
+```
+getsshclientcert --vault https://vault.home.arpa:8200
+
+ssh ops@bind.home.arpa bash <<EOF
+sudo su
+set -euo pipefail
+
+addhost.sh ollama 192.168.3.12
+
+tsig-keygen -a hmac-sha512 gpu-worker-cert-manager >> /etc/bind/named.conf.tsigkeys
+
+add-update-policy.sh "grant gpu-worker-cert-manager name _acme-challenge.ollama.home.arpa txt;"
+EOF
+```
+
+Deploy the tsig credential
+```
+ssh ops@bind.home.arpa bash > gpu-worker-cert-manager.tsig <<EOF
+sudo su
+set -euo pipefail
+
+cat /etc/bind/named.conf.tsigkeys | grep "key \"gpu-worker-cert-manager\"" -A2 | grep secret | cut -d'"' -f2
+EOF
+```
+
+### Deploy
+
+`./create-kind-gpu-cluster.sh --cluster gpu-worker --tsigname gpu-worker-cert-manager --tsigpath gpu-worker-cert-manager.tsig`
 
 ### Known Issues
 

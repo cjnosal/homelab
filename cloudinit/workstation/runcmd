@@ -154,6 +154,7 @@ chmod +x /usr/local/bin/yq
 
 snap install helm --classic
 snap install kubectl --classic
+snap install kustomize --classic
 
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc

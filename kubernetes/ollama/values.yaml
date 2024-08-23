@@ -1,0 +1,19 @@
+ollama:
+  models:
+    - phi3
+    - llama3.1
+  
+ingress:
+  enabled: true
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    cert-manager.io/cluster-issuer: bind-issuer
+  hosts:
+  - host: ollama.home.arpa
+    paths:
+      - path: /
+        pathType: Prefix
+  tls:
+  - secretName: ollama-tls
+    hosts:
+    - ollama.home.arpa

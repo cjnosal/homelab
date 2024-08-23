@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: open-webui
+spec:
+  template:
+    spec:
+      containers:
+        - name: open-webui
+          volumeMounts:
+          - name: certs
+            mountPath: /usr/local/share/ca-certificates
+            readOnly: true
+          env:
+          - name: SSL_CERT_FILE
+            value: /etc/ssl/certs/ca-certificates.crt
+          - name: REQUESTS_CA_BUNDLE
+            value: /etc/ssl/certs/ca-certificates.crt
+          command:
+          - bash
+          - -c
+          - |
+            update-ca-certificates
+            /app/backend/start.sh
+      volumes:
+      - name: certs
+        secret:
+          secretName: ca-bundle
+          optional: false
+

@@ -1,0 +1,38 @@
+ollama:
+  enabled: false
+pipelines:
+  enabled: false
+ollamaUrls:
+- https://ollama.home.arpa:30001
+  
+ingress:
+  enabled: true
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    cert-manager.io/cluster-issuer: step-issuer
+  host: gpt.eng.home.arpa
+  tls: true
+
+extraEnvVars:
+- name: ENABLE_SIGNUP
+  value: "false"
+- name: ENABLE_OPENAI_API
+  value: "false"
+- name: ENABLE_IMAGE_GENERATION
+  value: "false"
+- name: ENABLE_OAUTH_SIGNUP
+  value: "true"
+- name: OAUTH_CLIENT_ID
+  valueFrom: 
+    secretKeyRef:
+      name: oidc
+      key: client_id
+- name: OAUTH_CLIENT_SECRET
+  valueFrom: 
+    secretKeyRef:
+      name: oidc
+      key: client_secret
+- name: OPENID_PROVIDER_URL
+  value: "https://keycloak.home.arpa:8443/realms/infrastructure/.well-known/openid-configuration"
+- name: OPENID_REDIRECT_URI
+  value: "https://gpt.eng.home.arpa/oauth/oidc/callback"
