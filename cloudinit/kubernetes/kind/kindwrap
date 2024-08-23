@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FLAGS=()
+OPTIONS=(cluster)
+
+help_this="create a kind cluster. Docker run can be modified via passthrough args"
+
+help_cluster="cluster name"
+
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+source ${SCRIPT_DIR}/../../base/include/argshelper
+
+parseargs $@
+requireargs cluster
+
+export PATH=${SCRIPT_DIR}/shim:$PATH # insert docker shim into kind's path
+
+export  GODEBUG=execerrdot=0 # golang tries to prevent path overrides
+
+kind create cluster --name ${cluster} --config - <<EOF
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+nodes:
+- role: control-plane
+  image: kindest/node:v1.30.4@sha256:976ea815844d5fa93be213437e3ff5754cd599b040946b5cca43ca45c2047114
+  # required for GPU workaround
+  extraMounts:
+    - hostPath: /dev/null
+      containerPath: /var/run/nvidia-container-devices/all
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 30000
+    hostPort: 30000
+  - containerPort: 30001
+    hostPort: 30001
+EOF

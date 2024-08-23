@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# > 0 && "$1" == "run" ]]
+then
+  shift
+  /usr/bin/docker run ${DOCKER_SHIM_ARGS}  "$@"
+else
+  /usr/bin/docker "$@"
+fi
+

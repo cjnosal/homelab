@@ -65,3 +65,21 @@ Cert-manager is configured with two ClusterIssuers:
 
 ClusterIssuers can be referenced via Certificate spec or ingress annotation: 
 `cert-manager.io/cluster-issuer: step-issuer`
+
+## Kind with GPU on WSL2
+
+A kind cluster is created using Nvidia configuration and binaries to expose 'nvidia.com/gpu' resources to the cluster.
+
+### Prequisite
+
+The host's docker daemon must be configured to use the nvidia container toolkit and runtime. Run gpu/prepare-node on the host if needed.
+
+### Known Issues
+
+Note: After updating GPU drivers the OS blocks access to the GPU (can verify by running nvidia-smi). 
+Docker Desktop's WSL will terminate unexpectedly if a container tries to access the GPU in this state.
+WSL must be restarted (wsl --shutdown) to recover.
+
+Note: The current configuration does not support GPU timesharing. With a single GPU, 
+updating the ollama configuration will hang as the new pod will be in pending state waiting for the gpu.
+Patch the old replicaset to 0 desired replicas so the new pod can be scheduled.
