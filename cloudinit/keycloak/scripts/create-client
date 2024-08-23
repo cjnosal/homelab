@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# set client fields with `-s key=val` - see /opt/keycloak/bin/kcadm.sh create clients --help
+# set client fields with `-s key=val` - see kcadm.sh create clients --help
 # mapper "ldap-groups" automatically added to include LDAP groups in the "groups" token claim
 # prints client secret
 
@@ -26,23 +26,28 @@ requireargs authrealm realm
 
 if [[ -z "$username" ]]
 then
-  echo keycloak username:
+  >&2 echo keycloak username:
   read username
 fi
 
 if [[ -z "$password" ]]
 then
-  echo password:
+  >&2 echo password:
   read -s password
 fi
 
-/opt/keycloak/bin/kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
-CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} \
-  -s 'defaultClientScopes=["email", "preferred_username", "groups"]' \
+if [[ -d /opt/keycloak/bin ]]
+then
+  PATH=$PATH:/opt/keycloak/bin/
+fi
+
+kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
+CID=$(kcadm.sh create clients -r ${realm} \
+  -s 'defaultClientScopes=["email", "preferred_username", "groups", "profile"]' \
   -s 'optionalClientScopes=["address", "phone", "offline_access", "microprofile-jwt"]' \
   -i ${PASSTHROUGH[@]} )
 
-/opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
+kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
  -s name=ldap-groups \
  -s protocol=openid-connect \
  -s protocolMapper=oidc-group-membership-mapper \
@@ -53,7 +58,7 @@ CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} \
  -s 'config."userinfo.token.claim"=true' \
  -s 'config."access.token.claim"=true'
 
-/opt/keycloak/bin/kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
+kcadm.sh create clients/${CID}/protocol-mappers/models -r ${realm} \
  -s name=username \
  -s protocol=openid-connect \
  -s protocolMapper=oidc-usermodel-attribute-mapper \
@@ -64,4 +69,4 @@ CID=$(/opt/keycloak/bin/kcadm.sh create clients -r ${realm} \
  -s 'config."userinfo.token.claim"=true' \
  -s 'config."access.token.claim"=true'
 
-/opt/keycloak/bin/kcadm.sh get clients/$CID -r ${realm} --fields=secret | jq -r '.secret'
+kcadm.sh get clients/$CID -r ${realm} --fields=secret | jq -r '.secret'

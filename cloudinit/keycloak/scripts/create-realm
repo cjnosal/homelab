@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /opt/keycloak/bin
+if [[ -d /opt/keycloak/bin ]]
+then
+  PATH=$PATH:/opt/keycloak/bin/
+fi
 
 OPTIONS=(username password authrealm realm mail)
 
@@ -34,8 +37,8 @@ then
   read -s password
 fi
 
-./kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
-./kcadm.sh create realms -s enabled=true -s realm=${realm} \
+kcadm.sh config credentials --server ${HOST} --realm $authrealm --user $username --password $password
+kcadm.sh create realms -s enabled=true -s realm=${realm} \
   -s verifyEmail=true \
   -s "smtpServer.host=${mail}" \
   -s 'smtpServer.starttls=true' \
@@ -46,8 +49,8 @@ fi
   -s "smtpServer.replyTo=no-reply@${DOMAIN}" \
   -s "smtpServer.envelopeFrom=keycloak@${DOMAIN}"
 
-REALM_ID=$(./kcadm.sh get realms/${realm} --fields id | jq -r .id)
-LDAP_ID=$(./kcadm.sh create components -r ${realm} \
+REALM_ID=$(kcadm.sh get realms/${realm} --fields id | jq -r .id)
+LDAP_ID=$(kcadm.sh create components -r ${realm} \
     -s name="ldap" \
     -s parentId=$REALM_ID \
     -s providerId=ldap \
@@ -62,7 +65,7 @@ LDAP_ID=$(./kcadm.sh create components -r ${realm} \
     -s 'config.authType=["none"]' \
     -i)
 
-./kcadm.sh create components -r ${realm} \
+kcadm.sh create components -r ${realm} \
     -s name="group-ldap-mapper" \
     -s parentId=$LDAP_ID \
     -s providerId=group-ldap-mapper \
@@ -74,7 +77,7 @@ LDAP_ID=$(./kcadm.sh create components -r ${realm} \
     -s 'config."group.object.classes"=[ "groupOfNames" ]' \
     -i
 
-./kcadm.sh create client-scopes -r ${realm} \
+kcadm.sh create client-scopes -r ${realm} \
     -s name="groups" \
     -s protocol="openid-connect" \
     -s 'attributes."include.in.token.scope"=true' \
