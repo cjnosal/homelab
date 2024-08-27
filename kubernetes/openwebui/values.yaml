@@ -19,7 +19,9 @@ extraEnvVars:
 - name: ENABLE_OPENAI_API
   value: "false"
 - name: ENABLE_IMAGE_GENERATION
-  value: "false"
+  value: "true"
+- name: AUTOMATIC1111_BASE_URL
+  value: https://sd.home.arpa:30001
 - name: ENABLE_OAUTH_SIGNUP
   value: "true"
 - name: OAUTH_CLIENT_ID

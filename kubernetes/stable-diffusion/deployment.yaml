@@ -1,0 +1,205 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stable-diffusion
+  labels:
+    name: stable-diffusion
+    smallstep.com/inject: enabled
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  name: sd-web
+  namespace: stable-diffusion
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+  storageClassName: standard
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  name: sd-web
+  namespace: stable-diffusion
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  name: sd-web
+  namespace: stable-diffusion
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: sd-web
+      app.kubernetes.io/name: sd-web
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/instance: sd-web
+        app.kubernetes.io/name: sd-web
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsNonRoot: true
+      initContainers:
+      - name: download
+        image: harbor.eng.home.arpa/library/auto1111:latest
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - mountPath: /webui/stable-diffusion-webui/models/Stable-diffusion
+          name: sd-data
+        securityContext:
+          runAsUser: 10001
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          capabilities:
+            drop:
+            - ALL
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -euo pipefail
+            pushd /webui/stable-diffusion-webui/models/Stable-diffusion
+            if ! [[ -f v2-1_768-ema-pruned.safetensors ]]
+            then
+              echo "downloading model safetensors"
+              wget --progress=dot:giga https://huggingface.co/webui/stable-diffusion-2-1/resolve/main/v2-1_768-ema-pruned.safetensors
+            fi
+            if ! [[ -f v2-1_768-ema-pruned.yaml ]]
+            then
+              echo "downloading model config"
+              wget --progress=dot:giga https://huggingface.co/webui/stable-diffusion-2-1/resolve/main/v2-1_768-ema-pruned.yaml
+            fi
+      containers:
+      - image: harbor.eng.home.arpa/library/auto1111:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 6
+          tcpSocket:
+            port: 7861
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: sd-web
+        ports:
+        - containerPort: 7861
+          name: http
+          protocol: TCP
+        securityContext:
+          runAsUser: 10001
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          capabilities:
+            drop:
+            - ALL
+        command:
+          - /bin/bash
+          - -c
+          - |
+            /webui/stable-diffusion-webui/webui.sh --listen  --api --port 7861  \
+              --skip-prepare-environment --skip-install --no-download-sd-model --no-half
+        readinessProbe:
+          failureThreshold: 6
+          tcpSocket:
+            port: 7861
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+          requests:
+            nvidia.com/gpu: "1"
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /webui/stable-diffusion-webui/models/Stable-diffusion
+          name: sd-data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: sd-web
+      serviceAccountName: sd-web
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: sd-data
+        persistentVolumeClaim:
+          claimName: sd-web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  name: sd-web
+  namespace: stable-diffusion
+spec:
+  ports:
+  - name: http
+    port: 7861
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: bind-issuer
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  labels:
+    app.kubernetes.io/instance: sd-web
+    app.kubernetes.io/name: sd-web
+  name: sd-web
+  namespace: stable-diffusion
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: sd.home.arpa
+    http:
+      paths:
+      - backend:
+          service:
+            name: sd-web
+            port:
+              number: 7861
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - sd.home.arpa
+    secretName: sd-tls
