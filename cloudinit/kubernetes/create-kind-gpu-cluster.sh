@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FLAGS=()
-OPTIONS=(cluster)
+OPTIONS=(cluster tsigname tsigpath)
 
 help_this="create a kind cluster with nvidia gpu support"
 
@@ -14,7 +14,7 @@ SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 source ${SCRIPT_DIR}/../base/include/argshelper
 
 parseargs $@
-requireargs cluster
+requireargs cluster tsigname tsigpath
 
 export DOCKER_SHIM_ARGS="--gpus=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility -e NVIDIA_VISIBLE_DEVICES=all"
 ${SCRIPT_DIR}/kind/kindwrap --cluster ${cluster}

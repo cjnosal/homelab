@@ -1,0 +1,10 @@
+version: v1
+flags:
+  useNodeFeatureAPI: true
+  gfdEnabled: false
+  nfdEnabled: true
+sharing:
+  timeSlicing:
+    resources:
+    - name: nvidia.com/gpu
+      replicas: 10

@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.16.2/deployments/static/nvidia-device-plugin.yml --wait
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+kubectl get node -o jsonpath='{.items[].metadata.name}' | xargs -I{} \
+  kubectl label node {} feature.node.kubernetes.io/pci-10de.present=true
+
+kubectl apply -k https://github.com/kubernetes-sigs/node-feature-discovery/deployment/overlays/default?ref=v0.16.4 --wait
+
+helm upgrade -i nvdp nvdp/nvidia-device-plugin     \
+  --version=0.16.1     \
+  --namespace nvidia-device-plugin     \
+  --create-namespace     \
+  --set-file config.map.config=${SCRIPT_DIR}/ndp-config.yaml \
+  --wait
+
+kubectl get node -o jsonpath='{.items[].status.allocatable}' | grep "nvidia.com/gpu"
