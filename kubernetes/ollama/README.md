@@ -6,6 +6,10 @@ Deploy ollama to the gpu kind cluster
 
 `./deploy.sh --host ollama.home.arpa`
 
+### Admin Users
+
+Note that the first LDAP user to login is granted admin access.
+
 ## API
 
 ```
