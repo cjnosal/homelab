@@ -46,6 +46,7 @@ helm upgrade --install -n traefik traefik traefik/traefik --wait --create-namesp
 # tls
 STEP_CA=$(curl -kfSsL https://step.home.arpa:8444/step_root_ca.crt)
 STEP_CA_B64=$(base64 -w0 <<< $STEP_CA)
+STEP_INT_CA=$(curl https://step.home.arpa:8444/step_intermediate_ca.crt)
 helm repo add jetstack https://charts.jetstack.io
 helm upgrade -i -n cert-manager cert-manager jetstack/cert-manager --set installCRDs=true --wait --create-namespace --version v1.14.5
 
@@ -72,4 +73,55 @@ spec:
           tsigSecretSecretRef:
             name: tsig
             key: key
+EOF
+
+helm upgrade -i -n cert-manager trust-manager jetstack/trust-manager --set secretTargets.enabled=true --set-json secretTargets.authorizedSecrets="[\"home.arpa\",\"ca-bundle\"]" --wait --version v0.10.0
+
+kubectl create secret generic -n cert-manager --from-literal=ca.crt="$STEP_CA" step-root-ca   || kubectl get secret -n cert-manager step-root-ca
+kubectl create secret generic -n cert-manager --from-literal=ca.crt="$STEP_INT_CA" step-int-ca   || kubectl get secret -n cert-manager step-int-ca
+
+kubectl apply -f- << EOF
+---
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: home.arpa
+spec:
+  sources:
+  - secret:
+      name: "step-root-ca"
+      key: "ca.crt"
+  - secret:
+      name: "step-int-ca"
+      key: "ca.crt"
+  target:
+    configMap:
+      key: "home.arpa.pem"
+    secret:
+      key: "ca.crt"
+    namespaceSelector:
+      matchLabels:
+        smallstep.com/inject: "enabled"
+---
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ca-bundle
+spec:
+  sources:
+  - useDefaultCAs: true
+  - secret:
+      name: "step-root-ca"
+      key: "ca.crt"
+  - secret:
+      name: "step-int-ca"
+      key: "ca.crt"
+  target:
+    configMap:
+      key: "root-certs.pem"
+    secret:
+      key: "ca.crt"
+    namespaceSelector:
+      matchLabels:
+        smallstep.com/inject: "enabled"
 EOF

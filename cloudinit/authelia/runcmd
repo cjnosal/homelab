@@ -58,6 +58,9 @@ access_control:
   - name: k8s
     networks:
     - 10.244.0.0/16
+  - name: docker
+    networks:
+    - 172.16.0.0/12
   rules:
   - domain: loki.eng.home.arpa
     policy: one_factor
@@ -128,6 +131,51 @@ access_control:
     - '^/prometheus/api/v1/query_range$'
     - '^/prometheus/api/v1/labels$'
     - '^/prometheus/api/v1/series$'
+    networks:
+    - homelab
+    - k8s
+  - domain: sd.home.arpa
+    policy: bypass
+    methods:
+    - 'GET'
+    - 'HEAD'
+    resources:
+    - '^/?$'
+    networks:
+    - homelab
+    - k8s
+    - docker
+  - domain: sd.home.arpa
+    policy: bypass
+    methods:
+    - 'GET'
+    - 'HEAD'
+    - 'POST'
+    resources:
+    - '^/sdapi/v1/'
+    networks:
+    - homelab
+    - k8s
+    - docker
+  - domain: sd.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:sd-read']
+    methods:
+    - 'GET'
+    - 'HEAD'
+    networks:
+    - homelab
+    - k8s
+    - docker
+  - domain: sd.home.arpa
+    policy: one_factor
+    subject:
+    - ['group:sd-admin']
+    methods:
+    - 'POST'
+    - 'GET'
+    - 'HEAD'
     networks:
     - homelab
     - k8s

@@ -175,6 +175,8 @@ addldapgroup k8s-run-admin
 addldapgroup minio-admin
 addldapgroup grafana-admin
 addldapgroup grafana-editor
+addldapgroup sd-read
+addldapgroup sd-admin
 
 # authelia access to loki api
 addldapgroup loki-write
@@ -227,6 +229,8 @@ do
   addldapusertogroup $admin mimir-read
   addldapusertogroup $admin grafana-admin
   addldapusertogroup $admin grafana-editor
+  addldapusertogroup $admin sd-admin
+  addldapusertogroup $admin sd-read
 done
 
 addldapusertogroup alloy loki-write

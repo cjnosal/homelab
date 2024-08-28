@@ -22,3 +22,7 @@ And have the `bind-issuer` configured with corresponding tsig credential
 
 ### Run
 `./deploy.sh`
+
+
+### Configure Open-Webui
+A generated api key is written to creds/stable-diffusion. Copy to the open-webui admin panel.
